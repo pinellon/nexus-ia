@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nexus MVP</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    :root {
+      --bg: #f7f3eb;
+      --panel: rgba(255, 252, 245, 0.9);
+      --panel-strong: #fffaf0;
+      --line: #d8c8b0;
+      --text: #211b14;
+      --muted: #766553;
+      --accent: #b45309;
+      --accent-soft: #fef3c7;
+      --blue: #1d4ed8;
+      --green: #15803d;
+      --red: #b91c1c;
+      --shadow: 0 20px 60px rgba(90, 55, 12, 0.12);
+      --font: "Geist", sans-serif;
+      --mono: "Geist Mono", monospace;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: var(--font);
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(245, 158, 11, 0.18), transparent 28%),
+        radial-gradient(circle at bottom right, rgba(29, 78, 216, 0.12), transparent 30%),
+        linear-gradient(180deg, #fbf7ef 0%, #f4ede0 100%);
+    }
+
+    .shell {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 28px 20px 48px;
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: 1.2fr .8fr;
+      gap: 18px;
+      margin-bottom: 18px;
+    }
+
+    .panel {
+      background: var(--panel);
+      backdrop-filter: blur(18px);
+      border: 1px solid rgba(216, 200, 176, 0.8);
+      border-radius: 24px;
+      box-shadow: var(--shadow);
+    }
+
+    .hero-main {
+      padding: 28px;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(255, 250, 240, 0.85);
+      border: 1px solid rgba(216, 200, 176, 0.8);
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+    }
+
+    h1 {
+      margin: 18px 0 12px;
+      font-size: clamp(36px, 6vw, 64px);
+      line-height: 0.95;
+      letter-spacing: -0.06em;
+    }
+
+    .lead {
+      max-width: 56ch;
+      font-size: 16px;
+      line-height: 1.65;
+      color: var(--muted);
+    }
+
+    .hero-side {
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      justify-content: space-between;
+    }
+
+    .stat {
+      padding: 16px 18px;
+      border-radius: 18px;
+      background: rgba(255, 250, 240, 0.72);
+      border: 1px solid rgba(216, 200, 176, 0.7);
+    }
+
+    .stat-label {
+      font-size: 12px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 6px;
+    }
+
+    .stat-value {
+      font-size: 24px;
+      font-weight: 600;
+      letter-spacing: -0.04em;
+    }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(320px, .8fr);
+      gap: 18px;
+    }
+
+    .composer {
+      padding: 24px;
+    }
+
+    .panel-title {
+      margin: 0 0 16px;
+      font-size: 13px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    textarea,
+    input,
+    select {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: rgba(255, 252, 245, 0.94);
+      color: var(--text);
+      font: inherit;
+      outline: none;
+      transition: border-color .15s ease, transform .15s ease;
+    }
+
+    textarea:focus,
+    input:focus,
+    select:focus {
+      border-color: var(--accent);
+      transform: translateY(-1px);
+    }
+
+    textarea {
+      min-height: 144px;
+      resize: vertical;
+      padding: 16px 18px;
+      line-height: 1.6;
+      font-size: 15px;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 180px;
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    input, select {
+      padding: 14px 16px;
+      font-size: 14px;
+    }
+
+    .agents {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 16px;
+    }
+
+    .agent {
+      border: 1px solid var(--line);
+      background: rgba(255, 252, 245, 0.84);
+      color: var(--muted);
+      border-radius: 999px;
+      padding: 10px 14px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      transition: all .15s ease;
+    }
+
+    .agent.active {
+      color: var(--text);
+      border-color: var(--accent);
+      background: var(--accent-soft);
+      transform: translateY(-1px);
+    }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-top: 18px;
+    }
+
+    button {
+      border: 0;
+      border-radius: 999px;
+      background: linear-gradient(135deg, #20160f 0%, #5b3714 100%);
+      color: white;
+      padding: 14px 22px;
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform .15s ease, opacity .15s ease;
+    }
+
+    button:hover { transform: translateY(-1px); }
+    button:disabled { opacity: .6; cursor: wait; transform: none; }
+
+    .status {
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .stack {
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .stack-card {
+      border: 1px solid rgba(216, 200, 176, 0.8);
+      border-radius: 18px;
+      padding: 16px;
+      background: rgba(255, 252, 245, 0.74);
+    }
+
+    .stack-card strong {
+      display: block;
+      margin-bottom: 6px;
+    }
+
+    .results {
+      margin-top: 18px;
+      display: grid;
+      gap: 16px;
+    }
+
+    .summary {
+      padding: 18px 20px;
+      border-radius: 20px;
+      background: rgba(255, 250, 240, 0.96);
+      border: 1px solid rgba(216, 200, 176, 0.9);
+    }
+
+    .summary-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 8px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .cards {
+      display: grid;
+      gap: 14px;
+    }
+
+    .result-card {
+      border: 1px solid rgba(216, 200, 176, 0.86);
+      border-radius: 20px;
+      background: rgba(255, 252, 245, 0.94);
+      overflow: hidden;
+    }
+
+    .result-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      padding: 14px 18px;
+      border-bottom: 1px solid rgba(216, 200, 176, 0.7);
+      background: rgba(248, 239, 219, 0.5);
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border-radius: 999px;
+      padding: 7px 11px;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      background: var(--accent-soft);
+      color: #8a4b05;
+    }
+
+    .meta {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .result-body {
+      padding: 18px;
+      line-height: 1.7;
+      font-size: 14px;
+    }
+
+    .result-body pre {
+      margin: 14px 0;
+      padding: 14px;
+      overflow: auto;
+      border-radius: 14px;
+      border: 1px solid rgba(216, 200, 176, 0.8);
+      background: #201912;
+      color: #fff8ea;
+      font-family: var(--mono);
+      font-size: 12px;
+      line-height: 1.6;
+    }
+
+    .result-body code {
+      font-family: var(--mono);
+      font-size: 12px;
+      padding: 2px 5px;
+      border-radius: 6px;
+      background: rgba(216, 200, 176, 0.24);
+    }
+
+    .result-body p {
+      margin: 0 0 10px;
+    }
+
+    .mode-live { color: var(--green); }
+    .mode-mock { color: var(--blue); }
+    .error { color: var(--red); }
+
+    @media (max-width: 900px) {
+      .hero,
+      .workspace {
+        grid-template-columns: 1fr;
+      }
+
+      .row {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <section class="hero">
+      <div class="panel hero-main">
+        <div class="eyebrow"><span class="dot"></span> Nexus Coding Platform | MVP funcional</div>
+        <h1>Multi-agente de verdade, sem demo quebrada.</h1>
+        <p class="lead">
+          Esta base ja sobe localmente, envia o prompt para um backend Express e executa o orquestrador do Nexus.
+          Se houver <code>ANTHROPIC_API_KEY</code>, roda em modo live. Sem chave, entra em modo mock para o fluxo continuar testavel.
+        </p>
+      </div>
+      <aside class="panel hero-side">
+        <div class="stat">
+          <div class="stat-label">Estado do app</div>
+          <div class="stat-value" id="healthMode">Carregando...</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Endpoint</div>
+          <div class="stat-value">/api/orchestrate</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Objetivo</div>
+          <div class="stat-value">Base para camadas 4, 5 e 6</div>
+        </div>
+      </aside>
+    </section>
+
+    <section class="workspace">
+      <div class="panel composer">
+        <h2 class="panel-title">Orquestrador</h2>
+        <textarea id="prompt" placeholder="Ex: implemente um endpoint Express para salvar arquivos do projeto e explique os trade-offs."></textarea>
+        <div class="row">
+          <input id="context" placeholder="Contexto do projeto ou arquivo ativo">
+          <select id="language">
+            <option value="typescript">TypeScript</option>
+            <option value="javascript">JavaScript</option>
+            <option value="python">Python</option>
+            <option value="go">Go</option>
+            <option value="rust">Rust</option>
+          </select>
+        </div>
+        <div class="agents" id="agents"></div>
+        <div class="controls">
+          <button id="runButton">Executar Nexus</button>
+          <div class="status" id="statusText">Pronto para testar.</div>
+        </div>
+      </div>
+
+      <aside class="panel stack">
+        <h2 class="panel-title">Base entregue</h2>
+        <div class="stack-card">
+          <strong>Camada 4</strong>
+          Frontend servido localmente, cards por agente e resposta fundida.
+        </div>
+        <div class="stack-card">
+          <strong>Camada 5</strong>
+          API Express com health check e endpoint unico para o orquestrador.
+        </div>
+        <div class="stack-card">
+          <strong>Camada 6</strong>
+          Estrutura pronta para encaixar persistencia e RAG depois, sem quebrar o fluxo atual.
+        </div>
+      </aside>
+    </section>
+
+    <section class="results" id="results"></section>
+  </main>
+
+  <script>
+    const allAgents = ["claude", "codex", "antygravit", "vis"];
+    const activeAgents = new Set(["claude", "codex", "antygravit"]);
+
+    function escapeHtml(text) {
+      return text
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;");
+    }
+
+    function renderMarkdown(text) {
+      let html = escapeHtml(text);
+      html = html.replace(/```(\w+)?\n?([\s\S]*?)```/g, (_, __, code) => `<pre>${escapeHtml(code.trim())}</pre>`);
+      html = html.replace(/`([^`]+)`/g, "<code>$1</code>");
+      html = html.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+      html = html.replace(/\n{2,}/g, "</p><p>");
+      html = `<p>${html.replace(/\n/g, "<br>")}</p>`;
+      return html;
+    }
+
+    function renderAgents() {
+      const root = document.getElementById("agents");
+      root.innerHTML = "";
+
+      allAgents.forEach((name) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = `agent ${activeAgents.has(name) ? "active" : ""}`;
+        button.textContent = name;
+        button.addEventListener("click", () => {
+          if (activeAgents.has(name)) {
+            activeAgents.delete(name);
+          } else {
+            activeAgents.add(name);
+          }
+          renderAgents();
+        });
+        root.appendChild(button);
+      });
+    }
+
+    function renderResults(data) {
+      const results = document.getElementById("results");
+      const totalTokens = data.agents.reduce((sum, agent) => sum + (agent.tokens || 0), 0);
+
+      results.innerHTML = `
+        <div class="panel summary">
+          <strong>Resposta fundida</strong>
+          <div class="result-body">${renderMarkdown(data.merged)}</div>
+          <div class="summary-meta">
+            <span>${data.activeAgents} agentes ativos</span>
+            <span>${data.totalLatency}ms total</span>
+            <span>${totalTokens} tokens</span>
+            <span class="${data.mode === "live" ? "mode-live" : "mode-mock"}">modo ${data.mode}</span>
+          </div>
+        </div>
+        <div class="cards">
+          ${data.agents.map((agent) => `
+            <article class="result-card">
+              <header class="result-head">
+                <span class="badge">${agent.agent}</span>
+                <div class="meta">
+                  <span>${agent.latency}ms</span>
+                  <span>${agent.tokens} tokens</span>
+                  <span class="${agent.mode === "live" ? "mode-live" : "mode-mock"}">${agent.mode}</span>
+                  ${agent.error ? `<span class="error">${agent.error}</span>` : ""}
+                </div>
+              </header>
+              <div class="result-body">${renderMarkdown(agent.content)}</div>
+            </article>
+          `).join("")}
+        </div>
+      `;
+    }
+
+    async function loadHealth() {
+      try {
+        const response = await fetch("/api/health");
+        const data = await response.json();
+        document.getElementById("healthMode").textContent = data.mode === "live-ready" ? "Live ready" : "Mock ready";
+      } catch {
+        document.getElementById("healthMode").textContent = "Offline";
+      }
+    }
+
+    async function run() {
+      const prompt = document.getElementById("prompt").value.trim();
+      if (!prompt) {
+        document.getElementById("prompt").focus();
+        return;
+      }
+
+      if (activeAgents.size === 0) {
+        document.getElementById("statusText").textContent = "Selecione pelo menos um agente.";
+        return;
+      }
+
+      const button = document.getElementById("runButton");
+      const status = document.getElementById("statusText");
+      const results = document.getElementById("results");
+
+      button.disabled = true;
+      status.textContent = "Executando agentes...";
+      results.innerHTML = '<div class="panel summary">Processando resposta...</div>';
+
+      try {
+        const response = await fetch("/api/orchestrate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            prompt,
+            context: document.getElementById("context").value.trim(),
+            language: document.getElementById("language").value,
+            agents: [...activeAgents]
+          })
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.error || "Falha ao executar o orquestrador");
+        }
+
+        renderResults(data);
+        status.textContent = `Concluido em ${data.totalLatency}ms (${data.mode}).`;
+      } catch (error) {
+        results.innerHTML = `<div class="panel summary"><strong>Falha</strong><div class="result-body"><p>${escapeHtml(error.message)}</p></div></div>`;
+        status.textContent = "Execucao falhou.";
+      } finally {
+        button.disabled = false;
+      }
+    }
+
+    document.getElementById("runButton").addEventListener("click", run);
+    document.addEventListener("keydown", (event) => {
+      if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+        run();
+      }
+    });
+
+    renderAgents();
+    loadHealth();
+  </script>
+</body>
+</html>
