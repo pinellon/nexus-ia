@@ -6,7 +6,8 @@ export type AgentRunStatus =
   | "needs_approval"
   | "completed"
   | "failed"
-  | "cancelled";
+  | "cancelled"
+  | "interrupted";
 
 export type AgentEventType =
   | "started"

@@ -7,3 +7,11 @@ workspace
 test_api.cjs
 public/site-builder-draft.html
 docs/agent-test.md
+*.zip
+*.7z
+*.rar
+*.tar
+*.tar.gz
+*.tgz
+*.log
+.tmp-tests/

@@ -6,6 +6,7 @@ import { agentRegistry } from "../agents/registry.js";
 import { agentRunner } from "../agents/runner.js";
 import type { AgentRunStatus } from "../agents/models.js";
 import { addStagedFile, applyStagedFile, clearStagedFiles, getStagedFile, listStagedFiles, removeStagedFile } from "./staged-files.js";
+import { aiRateLimiter } from "../../rate-limit.js";
 
 const contextBuilder = new ContextBuilder();
 
@@ -137,7 +138,7 @@ export function registerAgentRoutes(app: Express) {
     }
   });
 
-  app.post("/api/code-chat", async (req, res) => {
+  app.post("/api/code-chat", aiRateLimiter, async (req, res) => {
     const { messages, streaming, allow_premium, force_local, project_context } = req.body as {
       messages?: unknown;
       streaming?: boolean;
@@ -322,7 +323,7 @@ export function registerAgentRoutes(app: Express) {
     });
   });
 
-  app.post("/api/agents/run", async (req, res) => {
+  app.post("/api/agents/run", aiRateLimiter, async (req, res) => {
     const { agent_id, goal, project_root } = req.body as {
       agent_id?: string;
       goal?: string;

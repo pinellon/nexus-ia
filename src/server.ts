@@ -44,6 +44,7 @@ import {
   githubSearch,
   webSearch
 } from "./research-tools.js";
+import { aiRateLimiter, commandRateLimiter, generalWriteRateLimiter } from "./rate-limit.js";
 import {
   appendMessage,
   createSession,
@@ -364,7 +365,7 @@ app.get("/api/project/file", async (req, res) => {
   }
 });
 
-app.post("/api/project/file", async (req, res) => {
+app.post("/api/project/file", generalWriteRateLimiter, async (req, res) => {
   const {
     projectRoot: targetRoot = ".",
     path: targetPath,
@@ -393,7 +394,7 @@ app.post("/api/project/file", async (req, res) => {
   }
 });
 
-app.put("/api/project/file", async (req, res) => {
+app.put("/api/project/file", generalWriteRateLimiter, async (req, res) => {
   const {
     projectRoot: targetRoot = ".",
     path: targetPath,
@@ -525,7 +526,7 @@ app.get("/api/project/git/status", (_req, res) => {
   }
 });
 
-app.post("/api/project/run-command", async (req, res) => {
+app.post("/api/project/run-command", commandRateLimiter, async (req, res) => {
   try {
     const { command, commandId } = req.body as { command?: string; commandId?: string };
     const result = await executeProjectCommand(command || commandId || "", projectRoot);
@@ -585,7 +586,7 @@ app.delete("/api/sessions/:id", async (req, res) => {
   }
 });
 
-app.post("/api/sessions/:id/orchestrate", async (req, res) => {
+app.post("/api/sessions/:id/orchestrate", aiRateLimiter, async (req, res) => {
   const { prompt, context, language, agents } = parsePromptBody(req);
 
   if (!prompt?.trim()) {
@@ -597,7 +598,7 @@ app.post("/api/sessions/:id/orchestrate", async (req, res) => {
   }
 
   try {
-    const session = await getSession(req.params.id);
+    const session = await getSession(String(req.params.id));
     if (!session) {
       return res.status(404).json({ error: "Sessao nao encontrada" });
     }
@@ -619,7 +620,7 @@ app.post("/api/sessions/:id/orchestrate", async (req, res) => {
   }
 });
 
-app.post("/api/orchestrate", async (req, res) => {
+app.post("/api/orchestrate", aiRateLimiter, async (req, res) => {
   const { prompt, context, language, agents } = parsePromptBody(req);
   const sessionId = (req.body as { sessionId?: string }).sessionId;
 
@@ -1004,7 +1005,7 @@ app.post("/api/actions/reject", async (req, res) => {
   }
 });
 
-app.post("/api/tools/web-search", async (req, res) => {
+app.post("/api/tools/web-search", aiRateLimiter, async (req, res) => {
   try {
     const query = String((req.body as { query?: string }).query || "");
     res.json({ results: await webSearch(query) });
@@ -1014,7 +1015,7 @@ app.post("/api/tools/web-search", async (req, res) => {
   }
 });
 
-app.post("/api/tools/github-search", async (req, res) => {
+app.post("/api/tools/github-search", aiRateLimiter, async (req, res) => {
   try {
     const { query, repo } = req.body as { query?: string; repo?: string };
     if (!query?.trim()) {
@@ -1032,7 +1033,7 @@ app.post("/api/tools/github-search", async (req, res) => {
   }
 });
 
-app.post("/api/tools/fetch-url", async (req, res) => {
+app.post("/api/tools/fetch-url", aiRateLimiter, async (req, res) => {
   try {
     const url = String((req.body as { url?: string }).url || "");
     return res.json({ result: await fetchUrl(url) });
@@ -1066,7 +1067,7 @@ app.get("/api/workspace/file", async (req, res) => {
   }
 });
 
-app.post("/api/workspace/file", async (req, res) => {
+app.post("/api/workspace/file", generalWriteRateLimiter, async (req, res) => {
   const { path: targetPath, content = "" } = req.body as { path?: string; content?: string };
   if (!targetPath?.trim()) {
     return res.status(400).json({ error: "path e obrigatorio" });
@@ -1080,7 +1081,7 @@ app.post("/api/workspace/file", async (req, res) => {
   }
 });
 
-app.put("/api/workspace/file", async (req, res) => {
+app.put("/api/workspace/file", generalWriteRateLimiter, async (req, res) => {
   const { path: targetPath, content = "" } = req.body as { path?: string; content?: string };
   if (!targetPath?.trim()) {
     return res.status(400).json({ error: "path e obrigatorio" });
@@ -1108,7 +1109,7 @@ app.delete("/api/workspace/file", async (req, res) => {
   }
 });
 
-app.post("/api/commands/run", async (req, res) => {
+app.post("/api/commands/run", commandRateLimiter, async (req, res) => {
   const { commandId } = req.body as { commandId?: AllowedCommandId };
   if (!commandId) {
     return res.status(400).json({ error: "commandId e obrigatorio" });
@@ -1124,7 +1125,7 @@ app.post("/api/commands/run", async (req, res) => {
   }
 });
 
-app.post("/api/tests/run", async (req, res) => {
+app.post("/api/tests/run", commandRateLimiter, async (req, res) => {
   try {
     const { command } = req.body as { command?: string };
     const result = await executeProjectCommand(command || "", projectRoot);
@@ -1234,7 +1235,7 @@ app.post("/api/ai/settings", async (req, res) => {
   }
 });
 
-app.post("/api/ai/test-provider", async (req, res) => {
+app.post("/api/ai/test-provider", aiRateLimiter, async (req, res) => {
   const { provider } = req.body as { provider?: string };
   if (!provider) return res.status(400).json({ ok: false, error: "provider é obrigatório" });
 
@@ -1259,7 +1260,7 @@ app.post("/api/ai/test-provider", async (req, res) => {
   }
 });
 
-app.post("/api/smart-orchestrate", async (req, res) => {
+app.post("/api/smart-orchestrate", aiRateLimiter, async (req, res) => {
   const { prompt, context, language } = parsePromptBody(req);
   const { sessionId } = req.body as { sessionId?: string };
 

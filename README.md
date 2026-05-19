@@ -35,6 +35,28 @@ npm run dev
 
 Abra [http://localhost:4000](http://localhost:4000).
 
+## Qualidade e CI
+
+Comandos principais:
+
+```bash
+npm run typecheck
+npm run build
+npm test
+npm run ci
+```
+
+O projeto usa Vitest para uma baseline minima de testes automatizados cobrindo:
+
+- whitelist de comandos seguros
+- bloqueios de path traversal e arquivos sensiveis
+- operacoes seguras de arquivos/pastas do projeto
+- aplicacao de acoes somente apos aprovacao
+- falha segura quando um patch fica stale
+- persistencia JSONL inicial de runs
+
+O CI em `.github/workflows/ci.yml` roda `npm ci`, typecheck, build e testes. Ha tambem um job opcional de secret scan com Gitleaks configurado como `continue-on-error` para nao bloquear desenvolvimento enquanto a politica de secrets e refinada.
+
 ## Como rodar a estrutura desktop
 
 Hoje os scripts deixam a base preparada para um shell desktop futuro:
@@ -143,7 +165,10 @@ Cada run cria:
 - timeline de eventos
 - artefatos persistidos em `data/projects/{project_id}/artifacts/`
 - historico em `data/projects/{project_id}/history.jsonl`
+- registro append-only em `data/runs.jsonl`
 - patch revisavel em Patch Review quando houver proposta de mudanca
+
+Runs iniciados passam a ser registrados em `data/runs.jsonl`. Em boot futuro, runs que ficaram em estado ativo (`started`, `planning` ou `running`) sem finalizacao sao marcados como `interrupted`. Isso ainda nao substitui uma persistencia transacional completa; SQLite continua sendo o proximo passo natural.
 
 Ferramentas iniciais do runtime:
 
@@ -174,9 +199,13 @@ Regra central:
 - Sem execucao de comando livre
 - Somente comandos whitelistados
 - Timeout em comandos
+- Rate limiting em endpoints caros de IA, agentes, comandos, testes e pesquisas
 - Logs truncados
 - Logs de terminal e historico passam por redacao simples de tokens
 - Chaves nunca expostas no frontend
+- Arquivos compactados e logs (`*.zip`, `*.7z`, `*.rar`, `*.tar`, `*.tar.gz`, `*.tgz`, `*.log`) nao devem ser commitados
+
+Nota: `files.zip` foi removido do estado atual do repositorio. Este PR nao reescreve historico; se algum artefato compactado ja esteve em commits antigos, a limpeza historica deve ser feita em um procedimento separado e revisado.
 
 ## Agentes conversacionais
 
@@ -281,22 +310,23 @@ Git:
 
 1. Rode `npm run typecheck`
 2. Rode `npm run build`
-3. Rode `npm run dev`
-4. Abra `Chat`, `Projeto`, `Patches`, `Executar`, `Agentes` e `Configuracoes`
-5. No `Code Chat`, peca: `crie um arquivo docs/agent-test.md com um resumo curto do Nexus Codex`
-6. Confirme que um `Agent Run` foi criado e o patch apareceu em `Patch Review`
-7. Revise o diff e clique em `Aplicar`
-8. Confirme que `docs/agent-test.md` existe no projeto
-9. Abra `Executar` e rode `npm run typecheck`
-10. Se houver falha, clique em `Corrigir com Nexus`
-11. Abra `Projeto` para revisar Git status e Git diff
+3. Rode `npm test`
+4. Rode `npm run dev`
+5. Abra `Chat`, `Projeto`, `Patches`, `Executar`, `Agentes` e `Configuracoes`
+6. No `Code Chat`, peca: `crie um arquivo docs/agent-test.md com um resumo curto do Nexus Codex`
+7. Confirme que um `Agent Run` foi criado e o patch apareceu em `Patch Review`
+8. Revise o diff e clique em `Aplicar`
+9. Confirme que `docs/agent-test.md` existe no projeto
+10. Abra `Executar` e rode `npm run typecheck`
+11. Se houver falha, clique em `Corrigir com Nexus`
+12. Abra `Projeto` para revisar Git status e Git diff
 
 ## Limitacoes atuais
 
 - O editor manual saiu da navegacao principal nesta versao compacta
 - Os heuristics dos agents ainda sao simples; o foco atual e fechar o loop principal, nao sofisticar o planner
 - O diff usa uma visualizacao textual clara, mas ainda nao e um diff Monaco lado a lado
-- Os runs ativos ficam em memoria do servidor
+- Os runs ativos ainda ficam principalmente em memoria do servidor; `data/runs.jsonl` registra eventos/status e marca ativos interrompidos no boot, mas SQLite ainda e o proximo passo
 - Nao ha push automatico nem deploy nesta fase
 
 ## Proximo passo natural

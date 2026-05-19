@@ -11,7 +11,7 @@ interface PendingActionsDatabase {
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const dataDir = path.resolve(__dirname, "../data");
+const dataDir = process.env.NEXUS_DATA_DIR ? path.resolve(process.env.NEXUS_DATA_DIR) : path.resolve(__dirname, "../data");
 const pendingActionsFile = path.join(dataDir, "pending-actions.json");
 const EMPTY_DB: PendingActionsDatabase = { actions: [] };
 

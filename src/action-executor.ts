@@ -20,7 +20,8 @@ import { createFile, deleteFile, fileExists, readFile, writeFile } from "./works
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, "..");
-const backupsRoot = path.resolve(__dirname, "../data/backups");
+const dataRoot = process.env.NEXUS_DATA_DIR ? path.resolve(process.env.NEXUS_DATA_DIR) : path.resolve(__dirname, "../data");
+const backupsRoot = path.resolve(dataRoot, "backups");
 
 function normalizeForDiffCheck(value: string) {
   return value.replace(/\r\n/g, "\n").trimEnd();

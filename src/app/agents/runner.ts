@@ -9,6 +9,7 @@ import { toolRegistry } from "./tools.js";
 import { nowIso } from "./utils.js";
 import { AIProviderRouter } from "../ai/provider-router.js";
 import { addStagedFile, listStagedFiles } from "../web/staged-files.js";
+import { agentRunStore } from "../runs/run-store.js";
 
 function matchGoal(goal: string, terms: string[]) {
   const lowered = goal.toLowerCase();
@@ -81,9 +82,16 @@ ${historySummary ? `## Contexto recente do projeto\n${historySummary}\n` : ""}
 export class AgentRunner {
   private readonly artifactStore = new ArtifactStore();
   private readonly history = new ProjectHistoryManager();
+  private readonly runStore = agentRunStore;
   private readonly runs = new Map<string, AgentRun>();
   private readonly events = new Map<string, AgentEvent[]>();
   private readonly artifacts = new Map<string, AgentArtifact[]>();
+
+  constructor() {
+    void this.runStore.markInterruptedRunsOnBoot().catch((error) => {
+      console.warn("[runs:boot]", error instanceof Error ? error.message : "Falha ao marcar runs interrompidas");
+    });
+  }
 
   async run_agent(agentId: string, userGoal: string, projectRoot: string): Promise<AgentRun> {
     const agent = agentRegistry.get(agentId);
@@ -115,6 +123,7 @@ export class AgentRunner {
     this.runs.set(runId, run);
     this.events.set(runId, []);
     this.artifacts.set(runId, []);
+    await this.runStore.recordRunStarted(run);
     await this.emitEvent(run, "started", `Agente ${agent.name} iniciado para ${resolved.absoluteRoot}`);
     await this.history.add_message(run.projectId, "user", normalizedGoal, {
       agentId: agent.id,
@@ -158,6 +167,7 @@ export class AgentRunner {
     }
 
     run.status = "cancelled";
+    await this.runStore.recordRunStatus(run.id, run.status);
     await this.emitEvent(run, "cancelled", "Execucao cancelada pelo usuario", "warning");
     await this.history.add_message(run.projectId, "system", `Run ${run.id} cancelada`, {
       runId: run.id
@@ -197,12 +207,14 @@ export class AgentRunner {
       run.status = "needs_approval";
       run.updatedAt = nowIso();
       run.currentMessage = "Artefatos e patches aguardando revisao do usuario";
+      await this.runStore.recordRunStatus(run.id, run.status);
       return;
     }
 
     run.status = "completed";
     run.updatedAt = nowIso();
     run.currentMessage = "Execucao concluida";
+    await this.runStore.recordRunStatus(run.id, run.status);
     await this.emitEvent(run, "completed", "Agente concluiu a execucao");
     await this.history.add_message(run.projectId, "assistant", `Run ${run.id} concluida pelo agente ${agent.id}`, {
       runId: run.id
@@ -605,6 +617,7 @@ Retorne APENAS o código completo dentro de um bloco \`\`\`${language} ... \`\`\
     this.events.set(run.id, events);
     run.updatedAt = event.createdAt;
     run.currentMessage = message;
+    await this.runStore.recordRunEvent(event);
     return event;
   }
 
@@ -632,6 +645,7 @@ Retorne APENAS o código completo dentro de um bloco \`\`\`${language} ... \`\`\
     run.status = status;
     run.updatedAt = nowIso();
     run.currentMessage = message;
+    await this.runStore.recordRunStatus(run.id, status);
     await this.history.add_message(run.projectId, "system", `${run.id}: ${message}`, {
       status,
       runId: run.id
@@ -642,6 +656,7 @@ Retorne APENAS o código completo dentro de um bloco \`\`\`${language} ... \`\`\
     run.status = run.status === "cancelled" ? "cancelled" : "failed";
     run.updatedAt = nowIso();
     run.currentMessage = message;
+    await this.runStore.recordRunStatus(run.id, run.status);
     await this.emitEvent(run, "failed", message, "error");
     await this.history.add_message(run.projectId, "system", `${run.id}: ${message}`, {
       status: run.status
