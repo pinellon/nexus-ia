@@ -1,10 +1,11 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Nexus Codex</title>
-  <style>
+/*
+Script para gerar o novo index.html com interface VS Code + Lovable.
+Isso recriará o arquivo sem risco de expirar tokens na resposta direta.
+*/
+const fs = require('fs');
+const path = require('path');
+
+const css = `
 *, *::before, *::after { box-sizing: border-box; }
 :root {
   --bg: #0b0d10; --surface: #111418; --surface-2: #171b20; --surface-3: #20262d;
@@ -90,7 +91,15 @@ pre.code-view { margin: 0; font-size: 13px; line-height: 1.5; color: #dbe7ef; fo
 .terminal-overlay.open { display: flex; }
 .terminal-header { padding: 8px 12px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 600; color: var(--muted); background: var(--surface); }
 .terminal-body { flex: 1; padding: 10px; overflow-y: auto; font-family: var(--mono); font-size: 12px; color: #dbe7ef; line-height: 1.4; white-space: pre-wrap; }
-</style>
+`;
+
+const html = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nexus Codex</title>
+  <style>${css}</style>
 </head>
 <body>
   <div class="app-container">
@@ -304,31 +313,12 @@ pre.code-view { margin: 0; font-size: 13px; line-height: 1.5; color: #dbe7ef; fo
       if(tab) tab.click();
     }
 
-    $('#btn-refresh-preview').onclick = () => {
-      const frame = $('#previewFrame');
-      if (frame.src) {
-        frame.src = frame.src;
-      }
-    };
-
-    $('#btn-open-preview').onclick = () => {
-      const frame = $('#previewFrame');
-      if (frame.src) {
-        window.open(frame.src, '_blank');
-      } else {
-        const url = $('#preview-url').value;
-        if (url && url.startsWith('http')) {
-          window.open(url, '_blank');
-        }
-      }
-    };
-
     // Terminal
     function toggleTerminal() { $('#terminal-overlay').classList.toggle('open'); }
     function clearTerminal() { $('#terminal-output').innerHTML = ''; }
     function logTerminal(msg) { 
       const out = $('#terminal-output');
-      out.innerHTML += msg + '\n';
+      out.innerHTML += msg + '\\n';
       out.scrollTop = out.scrollHeight;
     }
 
@@ -345,13 +335,8 @@ pre.code-view { margin: 0; font-size: 13px; line-height: 1.5; color: #dbe7ef; fo
 
     async function loadFiles(projectPath) {
       try {
-        const [projRes, stagedRes] = await Promise.all([
-          api('/api/project/files?projectRoot=' + encodeURIComponent(projectPath)),
-          api('/api/staged-files')
-        ]);
-        
-        state.files = projRes.files || [];
-        state.stagedFiles = stagedRes.data || [];
+        const res = await api('/api/project/files?projectRoot=' + encodeURIComponent(projectPath));
+        state.files = res.files || [];
         renderFileTree();
       } catch(e) {
         $('#fileTree').innerHTML = '<div class="empty-state">Falha ao ler arquivos</div>';
@@ -361,29 +346,12 @@ pre.code-view { margin: 0; font-size: 13px; line-height: 1.5; color: #dbe7ef; fo
     function renderFileTree() {
       const tree = $('#fileTree');
       tree.innerHTML = '';
-      if(!state.files.length && !state.stagedFiles?.length) {
+      if(!state.files.length) {
         tree.innerHTML = '<div class="empty-state">Nenhum arquivo encontrado</div>';
         return;
       }
       
-      // Renderizar Staged Files primeiro
-      (state.stagedFiles || []).forEach(f => {
-        const div = document.createElement('div');
-        div.className = 'file-item';
-        div.innerHTML = `📄 ${f.path} <span class="badge ok" style="margin-left:auto">Staged</span>`;
-        div.onclick = () => {
-          $all('.file-item').forEach(el => el.classList.remove('active'));
-          div.classList.add('active');
-          openFile(f.path, f);
-        };
-        tree.appendChild(div);
-      });
-
-      // Renderizar Arquivos do Projeto
       state.files.forEach(f => {
-        // Pular se já estiver em staging
-        if (state.stagedFiles?.some(sf => sf.path === f.path)) return;
-        
         const div = document.createElement('div');
         div.className = 'file-item';
         div.textContent = f.path;
@@ -396,173 +364,20 @@ pre.code-view { margin: 0; font-size: 13px; line-height: 1.5; color: #dbe7ef; fo
       });
     }
 
-    async function openFile(filePath, stagedFile = null) {
-      if(!state.project && !stagedFile) return;
+    async function openFile(filePath) {
+      if(!state.project) return;
       openTab('code');
-      $('#code-filename').innerHTML = 'Carregando ' + filePath + '...';
+      $('#code-filename').textContent = 'Carregando ' + filePath + '...';
       $('#code-content').textContent = '';
       
       try {
-        if (stagedFile) {
-          const res = await api('/api/staged-files/' + stagedFile.id);
-          const sf = res.data;
-          
-          let versionSelect = '';
-          if (sf.versions && sf.versions.length > 1) {
-            const opts = sf.versions.map((v, i) => `<option value="${v.version_id}">v${i+1} - ${new Date(v.created_at).toLocaleTimeString()}</option>`).reverse().join('');
-            versionSelect = `
-              <select id="staged-version-select" onchange="changeStagedVersion('${sf.id}')" style="margin-right:8px; padding:4px; font-size:11px; background:#111418; color:#fff; border:1px solid #3a4652; border-radius:4px;">${opts}</select>
-              <button class="btn-ghost" style="margin-right:8px; font-size:12px; padding:4px 8px; border:1px solid #3a4652;" title="Comparar Versão" onclick="compareStagedVersion('${sf.id}')">⚖️ Comparar</button>
-            `;
-          }
-          
-          $('#code-filename').innerHTML = `
-            <div style="display:flex; justify-content:space-between; align-items:center; width: 100%;">
-              <span>${filePath} <span class="badge ok">Staged</span></span>
-              <div style="display:flex; align-items:center; gap:6px;">
-                ${versionSelect}
-                <button class="btn-ghost" title="Copiar código" onclick="copyStagedCode()">📋</button>
-                <button class="btn-ghost" title="Baixar arquivo" onclick="downloadStagedCode('${filePath}')">⬇️</button>
-                <button class="btn-primary" onclick="applyStaged('${sf.id}', false)">Aplicar Código</button>
-                <button class="btn-primary" style="background:var(--yellow);color:#000" onclick="applyStaged('${sf.id}', true)">Aplicar e Testar</button>
-                <button class="btn-ghost" style="color:var(--red)" onclick="rejectStaged('${sf.id}')">Descartar</button>
-              </div>
-            </div>`;
-          $('#code-content').textContent = sf.content;
-          
-          if (filePath.endsWith('.html')) {
-            $('#preview-url').value = 'Preview Gerado';
-            $('#preview-placeholder').style.display = 'none';
-            const frame = $('#previewFrame');
-            frame.style.display = 'block';
-            frame.src = `/preview/staged/${sf.run_id}/index.html`;
-          }
-        } else {
-          const res = await api('/api/project/file?projectRoot=' + encodeURIComponent(state.project.projectPath) + '&filePath=' + encodeURIComponent(filePath));
-          $('#code-filename').textContent = filePath;
-          $('#code-content').textContent = res.content;
-        }
+        const res = await api('/api/project/file?projectRoot=' + encodeURIComponent(state.project.projectPath) + '&filePath=' + encodeURIComponent(filePath));
+        $('#code-filename').textContent = filePath;
+        $('#code-content').textContent = res.content;
       } catch(e) {
         $('#code-content').textContent = 'Falha ao carregar conteúdo: ' + e.message;
       }
     }
-
-    window.changeStagedVersion = async function(id) {
-      const vid = $('#staged-version-select').value;
-      const res = await api('/api/staged-files/' + id);
-      const version = res.data.versions.find(v => v.version_id === vid);
-      if (version) {
-        $('#code-content').textContent = version.content;
-      }
-    };
-
-    window.copyStagedCode = function() {
-      const code = $('#code-content').textContent;
-      navigator.clipboard.writeText(code);
-      setStatus("Código copiado!");
-    };
-
-    window.downloadStagedCode = function(filename) {
-      const code = $('#code-content').textContent;
-      const blob = new Blob([code], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename.split('/').pop() || 'codigo.txt';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    };
-    window.compareStagedVersion = async function(id) {
-      openTab('diff');
-      const res = await api('/api/staged-files/' + id);
-      const sf = res.data;
-      const versions = sf.versions;
-      if (versions.length < 2) {
-        $('#diff-content').innerHTML = '<div class="empty-state">Histórico com menos de 2 versões. Não é possível comparar.</div>';
-        return;
-      }
-      
-      const vCurrent = versions[versions.length - 1];
-      const vPrev = versions[versions.length - 2];
-      
-      let html = `
-        <div style="margin-bottom:15px;display:flex;justify-content:space-between;align-items:center;">
-          <h3 style="margin:0">Comparando Versões de ${sf.path}</h3>
-          <div>
-            <button class="btn-primary" onclick="restoreVersion('${sf.id}', '${vPrev.version_id}')">Restaurar Anterior (v${versions.length - 1})</button>
-          </div>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-          <div><div style="font-size:11px;color:var(--red);margin-bottom:5px">Versão Anterior (v${versions.length - 1})</div>
-            <pre class="code-view" style="background:#201313;padding:10px;border-radius:6px;border:1px solid var(--red);opacity:0.8;max-height:500px;overflow:auto;">${escapeHtml(vPrev.content)}</pre>
-          </div>
-          <div><div style="font-size:11px;color:var(--green);margin-bottom:5px">Versão Atual (v${versions.length})</div>
-            <pre class="code-view" style="background:#13201f;padding:10px;border-radius:6px;border:1px solid var(--green);max-height:500px;overflow:auto;">${escapeHtml(vCurrent.content)}</pre>
-          </div>
-        </div>
-      `;
-      $('#diff-content').innerHTML = html;
-    };
-
-    window.restoreVersion = async function(id, versionId) {
-      try {
-        await api('/api/staged-files/' + id + '/restore', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({ version_id: versionId })
-        });
-        setStatus("Versão restaurada com sucesso!");
-        const res = await api('/api/staged-files/' + id);
-        openFile(res.data.path, res.data);
-      } catch (err) {
-        alert("Erro ao restaurar: " + err.message);
-      }
-    };
-    window.applyStaged = async function(id, runTest = false) {
-      try {
-        await api('/api/staged-files/' + id + '/apply', { method: 'POST' });
-        setStatus("Arquivo aplicado com sucesso");
-        if (state.project) loadFiles(state.project.projectPath);
-        
-        if (runTest) {
-          setStatus("Rodando typecheck...");
-          logTerminal(">> npm run typecheck");
-          toggleTerminal();
-          const cmdRes = await api('/api/commands/run', {
-            method: 'POST',
-            headers: {'Content-Type':'application/json'},
-            body: JSON.stringify({ commandId: "typecheck" })
-          }).catch(e => ({ error: e.message }));
-          
-          if (cmdRes.error) {
-             logTerminal("Erro ao executar: " + cmdRes.error);
-             const btn = `<button class="btn-primary" style="margin-top:10px" onclick="$('#devmindChat input').value='Corrija o erro do typecheck'; $('#devmindChat form button').click()">Corrigir com Nexus</button>`;
-             $('#terminal-output').innerHTML += '<br>' + btn + '<br>';
-          } else {
-             logTerminal(cmdRes.result?.stdout || "");
-             logTerminal(cmdRes.result?.stderr || "");
-             if (cmdRes.result?.exitCode !== 0) {
-               const btn = `<button class="btn-primary" style="margin-top:10px" onclick="$('#devmindChat input').value='Corrija o erro no código'; $('#devmindChat form button').click()">Corrigir com Nexus</button>`;
-               $('#terminal-output').innerHTML += '<br>' + btn + '<br>';
-             } else {
-               logTerminal(">> Sucesso!");
-             }
-          }
-        }
-      } catch(e) { alert("Erro ao aplicar: " + e.message); }
-    };
-
-    window.rejectStaged = async function(id) {
-      try {
-        await api('/api/staged-files/' + id + '/reject', { method: 'POST' });
-        setStatus("Staged file removido");
-        $('#code-content').textContent = '';
-        $('#code-filename').textContent = 'Selecione um arquivo';
-        if (state.project) loadFiles(state.project.projectPath);
-      } catch(e) { alert("Erro ao descartar: " + e.message); }
-    };
 
     // DevMind Init
     if (window.DevMind) {
@@ -570,48 +385,28 @@ pre.code-view { margin: 0; font-size: 13px; line-height: 1.5; color: #dbe7ef; fo
         apiBase: '',
         containerId: 'devmindChat',
         onSuccess: (data) => {
-          if (state.project) loadFiles(state.project.projectPath);
-          
           if (data.patch_ids && data.patch_ids.length > 0) {
             loadPatches();
+            setTimeout(() => {
+              $('.activity-btn[data-target="patches"]').click();
+              openTab('diff');
+            }, 500);
           }
-          
-          // Se for uma tarefa de construção e criou staged files, vá para o código
-          setTimeout(() => {
-            if (state.stagedFiles && state.stagedFiles.length > 0) {
-              $('.activity-btn[data-target="explorer"]').click();
-              openFile(state.stagedFiles[0].path, state.stagedFiles[0]);
-            }
-          }, 500);
         }
       });
     }
 
-     // Patches
-     async function loadPatches() {
-       try {
-         const res = await api('/api/patches/pending');
-         const planPatch = (res.patches || []).find(p => p.reason === "++PLAN_PROPOSAL++");
-         state.patches = (res.patches || []).filter(p => p.reason !== "++PLAN_PROPOSAL++");
-         
-         if (planPatch) {
-           if (window.DevMind) {
-             window.DevMind.showPlan(planPatch);
-           }
-           // Rejeita o plano para removê-lo da fila segura de patches
-           await api('/api/patches/reject', {
-             method: 'POST',
-             headers: {'Content-Type': 'application/json'},
-             body: JSON.stringify({ actionIds: [planPatch.id] })
-           }).catch(() => {});
-         }
-
-         $('#act-patches').dataset.count = state.patches.length;
-         renderPatchSidebar();
-       } catch(e) {
-         console.error("Falha ao ler patches", e);
-       }
-     }
+    // Patches
+    async function loadPatches() {
+      try {
+        const res = await api('/api/patches/pending');
+        state.patches = res.patches || [];
+        $('#act-patches').dataset.count = state.patches.length;
+        renderPatchSidebar();
+      } catch(e) {
+        console.error("Falha ao ler patches", e);
+      }
+    }
 
     function renderPatchSidebar() {
       const list = $('#patchListSidebar');
@@ -620,12 +415,12 @@ pre.code-view { margin: 0; font-size: 13px; line-height: 1.5; color: #dbe7ef; fo
         $('#diff-content').innerHTML = '<div class="empty-state">Selecione um patch.</div>';
         return;
       }
-      list.innerHTML = state.patches.map(p => `
-        <div class="card" style="cursor:pointer;padding:10px;" onclick="viewPatch('${p.id}')">
-          <div style="font-weight:bold;font-size:12px;margin-bottom:4px;">${p.type}</div>
-          <div style="font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.path || p.reason}</div>
+      list.innerHTML = state.patches.map(p => \`
+        <div class="card" style="cursor:pointer;padding:10px;" onclick="viewPatch('\${p.id}')">
+          <div style="font-weight:bold;font-size:12px;margin-bottom:4px;">\${p.type}</div>
+          <div style="font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">\${p.path || p.reason}</div>
         </div>
-      `).join('');
+      \`).join('');
     }
 
     window.viewPatch = async function(id) {
@@ -633,30 +428,30 @@ pre.code-view { margin: 0; font-size: 13px; line-height: 1.5; color: #dbe7ef; fo
       const patch = state.patches.find(p => p.id === id);
       if(!patch) return;
       
-      let html = `
+      let html = \`
         <div style="margin-bottom:15px;display:flex;justify-content:space-between;">
-          <h3 style="margin:0">Patch: ${patch.type}</h3>
+          <h3 style="margin:0">Patch: \${patch.type}</h3>
           <div>
-            <button class="btn-primary" onclick="applyPatch('${id}')">Aplicar</button>
-            <button class="btn-ghost" style="color:var(--red)" onclick="rejectPatch('${id}')">Rejeitar</button>
+            <button class="btn-primary" onclick="applyPatch('\${id}')">Aplicar</button>
+            <button class="btn-ghost" style="color:var(--red)" onclick="rejectPatch('\${id}')">Rejeitar</button>
           </div>
         </div>
-        <div style="font-size:13px;margin-bottom:10px;">Arquivo: ${patch.path || '-'}</div>
-      `;
+        <div style="font-size:13px;margin-bottom:10px;">Arquivo: \${patch.path || '-'}</div>
+      \`;
 
       if (patch.type === 'create_file' || patch.type === 'write_file') {
-        html += `<pre class="code-view" style="background:#13201f;padding:10px;border-radius:6px;border:1px solid var(--green)">${escapeHtml(patch.content || '')}</pre>`;
+        html += \`<pre class="code-view" style="background:#13201f;padding:10px;border-radius:6px;border:1px solid var(--green)">\${escapeHtml(patch.content || '')}</pre>\`;
       } else if (patch.type === 'patch_file') {
-        html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        html += \`<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
           <div><div style="font-size:11px;color:var(--red);margin-bottom:5px">Antes</div>
-            <pre class="code-view" style="background:#201313;padding:10px;border-radius:6px;border:1px solid var(--red);opacity:0.8">${escapeHtml(patch.before || '')}</pre>
+            <pre class="code-view" style="background:#201313;padding:10px;border-radius:6px;border:1px solid var(--red);opacity:0.8">\${escapeHtml(patch.before || '')}</pre>
           </div>
           <div><div style="font-size:11px;color:var(--green);margin-bottom:5px">Depois</div>
-            <pre class="code-view" style="background:#13201f;padding:10px;border-radius:6px;border:1px solid var(--green)">${escapeHtml(patch.after || '')}</pre>
+            <pre class="code-view" style="background:#13201f;padding:10px;border-radius:6px;border:1px solid var(--green)">\${escapeHtml(patch.after || '')}</pre>
           </div>
-        </div>`;
+        </div>\`;
       } else {
-        html += `<pre class="code-view">${JSON.stringify(patch, null, 2)}</pre>`;
+        html += \`<pre class="code-view">\${JSON.stringify(patch, null, 2)}</pre>\`;
       }
 
       $('#diff-content').innerHTML = html;
@@ -664,7 +459,7 @@ pre.code-view { margin: 0; font-size: 13px; line-height: 1.5; color: #dbe7ef; fo
 
     window.applyPatch = async function(id) {
       try {
-        await api(`/api/patches/pending/${id}/apply`, { method: 'POST' });
+        await api(\`/api/patches/pending/\${id}/apply\`, { method: 'POST' });
         setStatus("Patch aplicado com sucesso!");
         $('#diff-content').innerHTML = '<div class="empty-state">Patch aplicado.</div>';
         loadPatches();
@@ -674,7 +469,7 @@ pre.code-view { margin: 0; font-size: 13px; line-height: 1.5; color: #dbe7ef; fo
 
     window.rejectPatch = async function(id) {
       try {
-        await api(`/api/patches/pending/${id}`, { method: 'DELETE' });
+        await api(\`/api/patches/pending/\${id}\`, { method: 'DELETE' });
         setStatus("Patch rejeitado.");
         $('#diff-content').innerHTML = '<div class="empty-state">Patch rejeitado.</div>';
         loadPatches();
@@ -725,20 +520,20 @@ pre.code-view { margin: 0; font-size: 13px; line-height: 1.5; color: #dbe7ef; fo
           const st = cfg.configured ? "ok" : "miss";
           const stLabel = cfg.configured ? "✓ Configurado" : "Ausente";
           const keyVal = cfg.keyPreview || cfg.baseUrl || "";
-          return `
+          return \`
           <div class="card" style="padding:12px;">
-            <div class="card-title">${p.name} <span class="badge ${st}" id="badge-${p.id}">${stLabel}</span></div>
+            <div class="card-title">\${p.name} <span class="badge \${st}" id="badge-\${p.id}">\${stLabel}</span></div>
             <div class="form-group" style="margin-bottom:8px">
-              <input type="text" id="key-${p.id}" placeholder="${keyVal || p.keyPh}" style="margin-bottom:6px">
-              <input type="text" id="mod-${p.id}" placeholder="${p.modelPh}" value="${cfg.model || p.modelPh}">
+              <input type="text" id="key-\${p.id}" placeholder="\${keyVal || p.keyPh}" style="margin-bottom:6px">
+              <input type="text" id="mod-\${p.id}" placeholder="\${p.modelPh}" value="\${cfg.model || p.modelPh}">
             </div>
-            ${p.isLocal ? `<div style="font-size:10px;color:var(--muted);margin-bottom:8px">Rode: ollama pull ${p.modelPh}</div>` : ""}
+            \${p.isLocal ? \`<div style="font-size:10px;color:var(--muted);margin-bottom:8px">Rode: ollama pull \${p.modelPh}</div>\` : ""}
             <div style="display:flex;gap:6px">
-              <button class="btn-primary" onclick="saveProv('${p.id}')">Salvar</button>
-              <button class="btn-secondary" onclick="testProv('${p.id}')">Testar</button>
-              <span id="msg-${p.id}" style="font-size:11px;margin-left:auto;align-self:center;color:var(--muted)"></span>
+              <button class="btn-primary" onclick="saveProv('\${p.id}')">Salvar</button>
+              <button class="btn-secondary" onclick="testProv('\${p.id}')">Testar</button>
+              <span id="msg-\${p.id}" style="font-size:11px;margin-left:auto;align-self:center;color:var(--muted)"></span>
             </div>
-          </div>`;
+          </div>\`;
         }).join('');
 
       } catch(e) {}
@@ -760,9 +555,9 @@ pre.code-view { margin: 0; font-size: 13px; line-height: 1.5; color: #dbe7ef; fo
     });
 
     window.saveProv = async function(id) {
-      const msg = $(`#msg-${id}`);
-      const key = $(`#key-${id}`).value;
-      const mod = $(`#mod-${id}`).value;
+      const msg = $(\`#msg-\${id}\`);
+      const key = $(\`#key-\${id}\`).value;
+      const mod = $(\`#mod-\${id}\`).value;
       msg.textContent = "Salvando...";
       try {
         const body = { providers: { [id]: { model: mod || undefined } } };
@@ -771,12 +566,12 @@ pre.code-view { margin: 0; font-size: 13px; line-height: 1.5; color: #dbe7ef; fo
         
         await api('/api/ai/settings', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
         msg.textContent = "✓ Salvo";
-        if(key) { $(`#badge-${id}`).className = "badge ok"; $(`#badge-${id}`).textContent = "✓ Configurado"; }
+        if(key) { $(\`#badge-\${id}\`).className = "badge ok"; $(\`#badge-\${id}\`).textContent = "✓ Configurado"; }
       } catch(e) { msg.textContent = "Erro"; }
     };
 
     window.testProv = async function(id) {
-      const msg = $(`#msg-${id}`);
+      const msg = $(\`#msg-\${id}\`);
       msg.textContent = "Testando...";
       try {
         const res = await api('/api/ai/test-provider', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ provider: id }) });
@@ -790,4 +585,7 @@ pre.code-view { margin: 0; font-size: 13px; line-height: 1.5; color: #dbe7ef; fo
 
   </script>
 </body>
-</html>
+</html>`;
+
+fs.writeFileSync(path.join(__dirname, '../public/index.html'), html);
+console.log('index.html gerado com sucesso!');
