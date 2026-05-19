@@ -111,6 +111,27 @@ pre.code-view { margin: 0; font-size: 13px; line-height: 1.5; color: #dbe7ef; fo
 .file-tab-close:hover { background: var(--surface-3); color: var(--red); }
 .monaco-shell { min-height: 0; position: relative; }
 #monaco-editor { position: absolute; inset: 0; }
+#view-diff { padding: 0; overflow: hidden; }
+#view-diff.active { display: flex; flex-direction: column; }
+.patch-review-layout { display: grid; grid-template-rows: auto auto minmax(0, 1fr) auto; height: 100%; min-height: 0; }
+.patch-review-header { padding: 12px 16px; border-bottom: 1px solid var(--line); background: var(--surface); }
+.patch-review-title { margin: 0 0 8px; font-size: 15px; font-weight: 600; }
+.patch-review-meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; font-size: 12px; color: var(--soft); }
+.patch-review-meta strong { color: var(--text); font-weight: 600; }
+.patch-files { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 16px; border-bottom: 1px solid var(--line); background: #0d1014; }
+.patch-file-btn { padding: 5px 10px; border-radius: 4px; border: 1px solid var(--line); background: var(--surface-2); color: var(--soft); font-size: 11px; }
+.patch-file-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(86, 214, 201, 0.08); }
+.monaco-diff-shell { position: relative; min-height: 0; }
+#monaco-diff-editor { position: absolute; inset: 0; }
+.patch-review-actions { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 16px; border-top: 1px solid var(--line); background: var(--surface); }
+.patch-sidebar-card { cursor: pointer; padding: 10px; margin-bottom: 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); }
+.patch-sidebar-card.active { border-color: var(--accent); box-shadow: 0 0 0 1px rgba(86, 214, 201, 0.2); }
+.patch-sidebar-type { font-size: 11px; font-weight: 700; text-transform: uppercase; margin-bottom: 4px; }
+.patch-sidebar-path { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.patch-stale-alert { margin: 8px 16px 0; padding: 10px 12px; border-radius: 6px; border: 1px solid rgba(255, 107, 107, 0.4); background: rgba(255, 107, 107, 0.08); color: var(--soft); font-size: 12px; }
+.risk-low { color: var(--green); }
+.risk-medium { color: var(--yellow); }
+.risk-high { color: var(--red); }
 /* Terminal Panel (Bottom overlay) */
 .terminal-overlay { position: fixed; bottom: 30px; left: 270px; right: 300px; height: 250px; background: #0d1014; border-top: 1px solid var(--line); border-left: 1px solid var(--line); border-right: 1px solid var(--line); border-radius: 8px 8px 0 0; display: none; flex-direction: column; z-index: 50; }
 .terminal-overlay.open { display: flex; }
@@ -239,9 +260,19 @@ pre.code-view { margin: 0; font-size: 13px; line-height: 1.5; color: #dbe7ef; fo
         
         <!-- Diff Tab -->
         <div class="tab-view" id="view-diff">
-          <div id="diff-content">
-            <div class="empty-state">Selecione um patch pendente para revisar.</div>
+          <div id="patch-review-empty" class="empty-state" style="margin:20px;">
+            Nenhum patch pendente. Peça ao Nexus para criar ou modificar algo.
           </div>
+          <div class="patch-review-layout" id="patch-review-layout" style="display:none;">
+            <div class="patch-review-header" id="patch-review-header"></div>
+            <div class="patch-files" id="patch-review-files"></div>
+            <div class="monaco-diff-shell">
+              <div id="monaco-diff-editor"></div>
+            </div>
+            <div id="patch-stale-alert" class="patch-stale-alert" style="display:none;"></div>
+            <div class="patch-review-actions" id="patch-review-actions"></div>
+          </div>
+          <div id="diff-content" style="display:none;"></div>
         </div>
 
         <!-- Artifacts Tab -->
@@ -306,6 +337,13 @@ pre.code-view { margin: 0; font-size: 13px; line-height: 1.5; color: #dbe7ef; fo
       expandedDirs: new Set([""]),
       editor: null,
       monacoReady: null,
+      diffEditor: null,
+      diffModels: null,
+      monacoDiffReady: null,
+      diffSideBySide: true,
+      activePatchId: null,
+      activePatch: null,
+      activePatchFilePath: null,
       suppressEditorChange: false,
       saveStatus: "sem arquivo"
     };
@@ -743,6 +781,10 @@ pre.code-view { margin: 0; font-size: 13px; line-height: 1.5; color: #dbe7ef; fo
     };
     window.compareStagedVersion = async function(id) {
       openTab('diff');
+      $('#patch-review-layout').style.display = 'none';
+      $('#patch-review-empty').style.display = 'none';
+      const stagedDiff = $('#diff-content');
+      stagedDiff.style.display = 'block';
       const res = await api('/api/staged-files/' + id);
       const sf = res.data;
       const versions = sf.versions;
@@ -1020,100 +1062,7 @@ pre.code-view { margin: 0; font-size: 13px; line-height: 1.5; color: #dbe7ef; fo
       });
     }
 
-     // Patches
-     async function loadPatches() {
-       try {
-         const res = await api('/api/patches/pending');
-         const planPatch = (res.patches || []).find(p => p.reason === "++PLAN_PROPOSAL++");
-         state.patches = (res.patches || []).filter(p => p.reason !== "++PLAN_PROPOSAL++");
-         
-         if (planPatch) {
-           if (window.DevMind) {
-             window.DevMind.showPlan(planPatch);
-           }
-           // Rejeita o plano para removê-lo da fila segura de patches
-           await api('/api/patches/reject', {
-             method: 'POST',
-             headers: {'Content-Type': 'application/json'},
-             body: JSON.stringify({ actionIds: [planPatch.id] })
-           }).catch(() => {});
-         }
-
-         $('#act-patches').dataset.count = state.patches.length;
-         renderPatchSidebar();
-       } catch(e) {
-         console.error("Falha ao ler patches", e);
-       }
-     }
-
-    function renderPatchSidebar() {
-      const list = $('#patchListSidebar');
-      if(!state.patches.length) {
-        list.innerHTML = '<div class="empty-state">Nenhum patch.</div>';
-        $('#diff-content').innerHTML = '<div class="empty-state">Selecione um patch.</div>';
-        return;
-      }
-      list.innerHTML = state.patches.map(p => `
-        <div class="card" style="cursor:pointer;padding:10px;" onclick="viewPatch('${p.id}')">
-          <div style="font-weight:bold;font-size:12px;margin-bottom:4px;">${p.type}</div>
-          <div style="font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.path || p.reason}</div>
-        </div>
-      `).join('');
-    }
-
-    window.viewPatch = async function(id) {
-      openTab('diff');
-      const patch = state.patches.find(p => p.id === id);
-      if(!patch) return;
-      
-      let html = `
-        <div style="margin-bottom:15px;display:flex;justify-content:space-between;">
-          <h3 style="margin:0">Patch: ${patch.type}</h3>
-          <div>
-            <button class="btn-primary" onclick="applyPatch('${id}')">Aplicar</button>
-            <button class="btn-ghost" style="color:var(--red)" onclick="rejectPatch('${id}')">Rejeitar</button>
-          </div>
-        </div>
-        <div style="font-size:13px;margin-bottom:10px;">Arquivo: ${patch.path || '-'}</div>
-      `;
-
-      if (patch.type === 'create_file' || patch.type === 'write_file') {
-        html += `<pre class="code-view" style="background:#13201f;padding:10px;border-radius:6px;border:1px solid var(--green)">${escapeHtml(patch.content || '')}</pre>`;
-      } else if (patch.type === 'patch_file') {
-        html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-          <div><div style="font-size:11px;color:var(--red);margin-bottom:5px">Antes</div>
-            <pre class="code-view" style="background:#201313;padding:10px;border-radius:6px;border:1px solid var(--red);opacity:0.8">${escapeHtml(patch.before || '')}</pre>
-          </div>
-          <div><div style="font-size:11px;color:var(--green);margin-bottom:5px">Depois</div>
-            <pre class="code-view" style="background:#13201f;padding:10px;border-radius:6px;border:1px solid var(--green)">${escapeHtml(patch.after || '')}</pre>
-          </div>
-        </div>`;
-      } else {
-        html += `<pre class="code-view">${JSON.stringify(patch, null, 2)}</pre>`;
-      }
-
-      $('#diff-content').innerHTML = html;
-    };
-
-    window.applyPatch = async function(id) {
-      try {
-        await api(`/api/patches/pending/${id}/apply`, { method: 'POST' });
-        setStatus("Patch aplicado com sucesso!");
-        $('#diff-content').innerHTML = '<div class="empty-state">Patch aplicado.</div>';
-        loadPatches();
-        if (state.project) loadFiles(state.project.projectPath);
-      } catch(e) {}
-    };
-
-    window.rejectPatch = async function(id) {
-      try {
-        await api(`/api/patches/pending/${id}`, { method: 'DELETE' });
-        setStatus("Patch rejeitado.");
-        $('#diff-content').innerHTML = '<div class="empty-state">Patch rejeitado.</div>';
-        loadPatches();
-      } catch(e) {}
-    };
-
+    // Patches: see /patch-review.js
     function escapeHtml(s) {
       return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     }
@@ -1219,8 +1168,9 @@ pre.code-view { margin: 0; font-size: 13px; line-height: 1.5; color: #dbe7ef; fo
 
     // Boot
     loadHealth();
-    loadPatches();
 
   </script>
+  <script src="/patch-review.js"></script>
+  <script>loadPatches();</script>
 </body>
 </html>
