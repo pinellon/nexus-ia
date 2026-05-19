@@ -4,1223 +4,195 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Nexus Codex</title>
-  <style>
-*, *::before, *::after { box-sizing: border-box; }
-:root {
-  --bg: #0b0d10; --surface: #111418; --surface-2: #171b20; --surface-3: #20262d;
-  --line: #2a3038; --line-strong: #3a4652; --text: #eef3f7; --muted: #9aa7b2;
-  --soft: #c7d0d8; --accent: #56d6c9; --green: #65d48a; --red: #ff6b6b; --yellow: #f3c969;
-  --font: "Geist", sans-serif; --mono: "Geist Mono", monospace;
-}
-body { margin: 0; min-height: 100vh; background: var(--bg); color: var(--text); font-family: var(--font); overflow: hidden; }
-button, input, textarea, select { font: inherit; outline: none; }
-button { border: 0; cursor: pointer; }
-code, pre { font-family: var(--mono); }
-/* Layout Principal - 4 painéis */
-.app-container { display: grid; grid-template-columns: 50px 220px 1fr 300px; grid-template-rows: 1fr 30px; height: 100vh; }
-/* Activity Bar */
-.activity-bar { background: #080a0d; border-right: 1px solid var(--line); display: flex; flex-direction: column; align-items: center; padding-top: 10px; gap: 15px; }
-.activity-btn { width: 36px; height: 36px; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: var(--muted); background: transparent; transition: 0.2s; position: relative; }
-.activity-btn:hover { color: var(--text); background: var(--surface-2); }
-.activity-btn.active { color: var(--accent); border-left: 2px solid var(--accent); border-radius: 0 6px 6px 0; }
-.activity-btn[title="Patches"]::after { content: attr(data-count); position: absolute; top: -2px; right: -2px; background: var(--accent); color: #000; font-size: 9px; font-weight: bold; width: 14px; height: 14px; border-radius: 50%; display: flex; align-items: center; justify-content: center; opacity: 0; }
-.activity-btn[data-count]:not([data-count="0"]):not([data-count=""])::after { opacity: 1; }
-/* Sidebar (Explorer/Settings) */
-.sidebar-panel { background: var(--surface); border-right: 1px solid var(--line); display: flex; flex-direction: column; overflow: hidden; }
-.sidebar-header { padding: 12px 14px; font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--muted); letter-spacing: 0.5px; border-bottom: 1px solid var(--line); }
-.sidebar-content { flex: 1; overflow-y: auto; padding: 10px; }
-/* Views de sidebar */
-.side-view { display: none; flex-direction: column; height: 100%; }
-.side-view.active { display: flex; }
-/* Explorer File Tree */
-.file-tree { display: flex; flex-direction: column; gap: 2px; }
-.file-item { display: flex; align-items: center; gap: 6px; padding: 4px 6px; border-radius: 4px; font-size: 12px; color: var(--soft); cursor: pointer; user-select: none; }
-.file-item:hover { background: var(--surface-2); color: var(--text); }
-.file-item.active { background: rgba(86, 214, 201, 0.1); color: var(--accent); }
-.file-item.changed { color: var(--yellow); }
-.explorer-toolbar { display: flex; gap: 4px; padding: 8px; border-bottom: 1px solid var(--line); background: var(--surface); }
-.explorer-toolbar .btn-ghost { padding: 5px 7px; border: 1px solid var(--line); }
-.tree-row { display: flex; align-items: center; gap: 5px; min-height: 24px; padding: 3px 6px; border-radius: 4px; color: var(--soft); font-size: 12px; cursor: pointer; user-select: none; }
-.tree-row:hover { background: var(--surface-2); color: var(--text); }
-.tree-row.active { background: rgba(86, 214, 201, 0.1); color: var(--accent); }
-.tree-row.folder { font-weight: 600; }
-.tree-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tree-actions { display: none; gap: 2px; }
-.tree-row:hover .tree-actions { display: flex; }
-.tree-action { padding: 1px 4px; color: var(--muted); background: transparent; border-radius: 3px; font-size: 11px; }
-.tree-action:hover { background: var(--surface-3); color: var(--text); }
-/* Center Editor */
-.editor-panel { display: flex; flex-direction: column; background: var(--bg); min-width: 0; }
-.editor-tabs { display: flex; background: var(--surface); border-bottom: 1px solid var(--line); overflow-x: auto; }
-.editor-tab { padding: 10px 16px; font-size: 13px; color: var(--muted); border-right: 1px solid var(--line); background: transparent; display: flex; align-items: center; gap: 6px; }
-.editor-tab.active { background: var(--bg); color: var(--text); border-top: 2px solid var(--accent); }
-.editor-tab:hover:not(.active) { background: var(--surface-2); color: var(--text); }
-.editor-content { flex: 1; position: relative; overflow: hidden; }
-.tab-view { position: absolute; inset: 0; display: none; overflow: auto; padding: 20px; }
-.tab-view.active { display: block; }
-#view-chat { padding: 0; display: none; flex-direction: column; height: 100%; }
-#view-chat.active { display: flex; }
-/* DevMind Chat Container */
-#devmindChat { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
-/* Right Preview */
-.preview-panel { background: var(--surface); border-left: 1px solid var(--line); display: flex; flex-direction: column; }
-.preview-header { padding: 8px 12px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 8px; background: var(--surface-2); }
-.preview-url { flex: 1; padding: 6px 10px; background: #0d1014; border: 1px solid var(--line); border-radius: 4px; color: var(--muted); font-size: 11px; }
-.preview-btn { padding: 6px; background: transparent; color: var(--muted); border-radius: 4px; }
-.preview-btn:hover { background: var(--surface-3); color: var(--text); }
-.preview-content { flex: 1; background: #fff; display: flex; align-items: center; justify-content: center; }
-.preview-empty { color: #888; font-size: 13px; text-align: center; padding: 20px; }
-iframe#previewFrame { width: 100%; height: 100%; border: none; background: #fff; display: none; }
-/* Bottom Status Bar */
-.status-bar { grid-column: 1 / -1; background: var(--accent); color: #000; display: flex; align-items: center; justify-content: space-between; padding: 0 12px; font-size: 11px; font-weight: 600; }
-.status-left, .status-right { display: flex; align-items: center; gap: 12px; }
-.status-item { display: flex; align-items: center; gap: 4px; cursor: pointer; }
-/* Form Elements & Cards (Settings/IA) */
-.form-group { margin-bottom: 15px; }
-.form-group label { display: block; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; margin-bottom: 6px; }
-.form-group input, .form-group select { width: 100%; padding: 8px 10px; background: #0d1014; border: 1px solid var(--line); border-radius: 4px; color: var(--text); font-size: 13px; }
-.form-group input:focus, .form-group select:focus { border-color: var(--accent); }
-.form-group.checkbox { flex-direction: row; align-items: center; display: flex; gap: 8px; }
-.form-group.checkbox input { width: auto; }
-.form-group.checkbox label { text-transform: none; margin: 0; font-size: 13px; color: var(--soft); }
-.btn-primary { background: var(--accent); color: #000; padding: 8px 14px; border-radius: 4px; font-weight: 600; font-size: 12px; }
-.btn-secondary { background: var(--surface-3); color: var(--text); padding: 8px 14px; border-radius: 4px; font-weight: 600; font-size: 12px; border: 1px solid var(--line); }
-.btn-ghost { background: transparent; color: var(--muted); padding: 6px 10px; border-radius: 4px; font-size: 12px; }
-.btn-ghost:hover { background: var(--surface-2); color: var(--text); }
-.card { border: 1px solid var(--line); border-radius: 6px; padding: 14px; margin-bottom: 12px; background: var(--bg); }
-.card-title { font-size: 13px; font-weight: 600; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
-.badge { padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; }
-.badge.ok { background: rgba(101,212,138,0.15); color: var(--green); border: 1px solid rgba(101,212,138,0.3); }
-.badge.warn { background: rgba(243,201,105,0.15); color: var(--yellow); border: 1px solid rgba(243,201,105,0.3); }
-.badge.err { background: rgba(255,107,107,0.15); color: var(--red); border: 1px solid rgba(255,107,107,0.3); }
-.empty-state { padding: 30px; text-align: center; color: var(--muted); font-size: 13px; border: 1px dashed var(--line); border-radius: 8px; }
-/* Code block */
-pre.code-view { margin: 0; font-size: 13px; line-height: 1.5; color: #dbe7ef; font-family: var(--mono); white-space: pre-wrap; }
-.code-workbench { height: 100%; display: grid; grid-template-rows: auto auto minmax(0, 1fr); padding: 0; overflow: hidden; }
-.code-toolbar { min-height: 42px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 12px; border-bottom: 1px solid var(--line); background: var(--surface); }
-.code-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--soft); font-size: 13px; font-weight: 600; }
-.save-status { color: var(--muted); font-size: 11px; font-weight: 700; text-transform: uppercase; }
-.save-status.modified { color: var(--yellow); }
-.save-status.saved { color: var(--green); }
-.save-status.error { color: var(--red); }
-.file-tabs { display: flex; min-height: 36px; overflow-x: auto; border-bottom: 1px solid var(--line); background: #0d1014; }
-.file-tab { display: inline-flex; align-items: center; gap: 8px; max-width: 220px; padding: 8px 10px; border-right: 1px solid var(--line); background: transparent; color: var(--muted); font-size: 12px; }
-.file-tab.active { background: var(--bg); color: var(--text); border-top: 2px solid var(--accent); }
-.file-tab-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.file-tab-close { padding: 0 4px; border-radius: 3px; color: var(--muted); background: transparent; }
-.file-tab-close:hover { background: var(--surface-3); color: var(--red); }
-.monaco-shell { min-height: 0; position: relative; }
-#monaco-editor { position: absolute; inset: 0; }
-/* Terminal Panel (Bottom overlay) */
-.terminal-overlay { position: fixed; bottom: 30px; left: 270px; right: 300px; height: 250px; background: #0d1014; border-top: 1px solid var(--line); border-left: 1px solid var(--line); border-right: 1px solid var(--line); border-radius: 8px 8px 0 0; display: none; flex-direction: column; z-index: 50; }
-.terminal-overlay.open { display: flex; }
-.terminal-header { padding: 8px 12px; border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 600; color: var(--muted); background: var(--surface); }
-.terminal-body { flex: 1; padding: 10px; overflow-y: auto; font-family: var(--mono); font-size: 12px; color: #dbe7ef; line-height: 1.4; white-space: pre-wrap; }
-</style>
+  <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-  <div class="app-container">
+  <div class="ide-shell" id="ide-shell">
     <!-- Activity Bar -->
-    <div class="activity-bar">
-      <button class="activity-btn active" data-target="explorer" title="Explorer">📂</button>
-      <button class="activity-btn" data-target="patches" title="Patches" id="act-patches">📋</button>
-      <button class="activity-btn" data-target="settings" title="Configurações">⚙️</button>
-      <button class="activity-btn" data-target="ia" title="IA">🧠</button>
-    </div>
+    <nav class="activity-bar" aria-label="Activity Bar">
+      <button type="button" class="activity-btn active" data-target="explorer" title="Explorer">&#128193;</button>
+      <button type="button" class="activity-btn" data-target="search" title="Buscar">&#128269;</button>
+      <button type="button" class="activity-btn" data-target="git" title="Git">&#105;</button>
+      <button type="button" class="activity-btn" data-target="sessions" title="Sessões">&#128172;</button>
+      <button type="button" class="activity-btn" data-target="patches" title="Patches" id="act-patches" data-count="0">&#128203;</button>
+      <button type="button" class="activity-btn" data-target="settings" title="Configurações" style="margin-top:auto">&#9881;</button>
+    </nav>
 
-    <!-- Sidebar Panels -->
-    <div class="sidebar-panel">
-      <!-- Explorer -->
+    <!-- Sidebar -->
+    <aside class="sidebar-wrap" id="sidebar-wrap">
       <div class="side-view active" id="side-explorer">
-        <div class="sidebar-header">Explorer</div>
+        <div class="sidebar-header">
+          <span>Explorer</span>
+        </div>
         <div class="explorer-toolbar">
-          <button class="btn-ghost" id="btn-refresh-tree" title="Atualizar">Atualizar</button>
-          <button class="btn-ghost" id="btn-new-file" title="Novo arquivo">Arquivo</button>
-          <button class="btn-ghost" id="btn-new-folder" title="Nova pasta">Pasta</button>
+          <button type="button" class="icon-btn" id="btn-refresh-tree" title="Atualizar">↻</button>
+          <button type="button" class="icon-btn" id="btn-new-file" title="Novo arquivo">+ Arq</button>
+          <button type="button" class="icon-btn" id="btn-new-folder" title="Nova pasta">+ Pasta</button>
         </div>
         <div class="sidebar-content file-tree" id="fileTree">
-          <div style="color:var(--muted);font-size:12px;padding:10px;">Carregando arquivos...</div>
-        </div>
-      </div>
-      
-      <!-- Patches -->
-      <div class="side-view" id="side-patches">
-        <div class="sidebar-header" style="display:flex;justify-content:space-between;">
-          <span>Patches Pendentes</span>
-          <button class="btn-ghost" onclick="loadPatches()" style="padding:0">🔄</button>
-        </div>
-        <div class="sidebar-content" id="patchListSidebar">
-          <div class="empty-state">Nenhum patch pendente.</div>
+          <div class="empty-state">Carregando...</div>
         </div>
       </div>
 
-      <!-- Settings -->
+      <div class="side-view" id="side-search">
+        <div class="sidebar-header">Buscar</div>
+        <div class="sidebar-content placeholder-view">Busca no projeto em breve.</div>
+      </div>
+
+      <div class="side-view" id="side-git">
+        <div class="sidebar-header">Git</div>
+        <div class="sidebar-content placeholder-view">Status Git básico em breve.</div>
+      </div>
+
+      <div class="side-view" id="side-sessions">
+        <div class="sidebar-header">Sessões</div>
+        <div class="sidebar-content placeholder-view">Histórico de sessões em breve.</div>
+      </div>
+
       <div class="side-view" id="side-settings">
-        <div class="sidebar-header">Projeto e Básicos</div>
+        <div class="sidebar-header">Configurações</div>
         <div class="sidebar-content">
           <div class="form-group">
-            <label>Projeto Padrão</label>
-            <input type="text" id="set-project-path" placeholder="Caminho do projeto...">
-          </div>
-          <div class="form-group checkbox">
-            <input type="checkbox" id="set-confirm-danger" checked>
-            <label>Confirmar comandos perigosos</label>
-          </div>
-          <button class="btn-primary" style="width:100%">Salvar Configurações</button>
-        </div>
-      </div>
-
-      <!-- IA Settings -->
-      <div class="side-view" id="side-ia">
-        <div class="sidebar-header">Configuração de IA</div>
-        <div class="sidebar-content">
-          <div class="form-group">
-            <label>Modo de Uso</label>
+            <label>Modo de IA</label>
             <select id="ia-mode">
-              <option value="economy">Econômico (Local)</option>
-              <option value="balanced">Balanceado (Auto)</option>
-              <option value="premium">Premium (Cloud)</option>
+              <option value="economy">Econômico</option>
+              <option value="balanced">Balanceado</option>
+              <option value="premium">Premium</option>
               <option value="manual">Manual</option>
             </select>
           </div>
           <div class="form-group">
-            <label>Provider Principal</label>
+            <label>Provider</label>
             <select id="ia-provider">
               <option value="auto">Automático</option>
-              <option value="ollama">Ollama (Local)</option>
-              <option value="anthropic">Claude / Anthropic</option>
+              <option value="ollama">Ollama</option>
+              <option value="anthropic">Anthropic</option>
               <option value="openai">OpenAI</option>
-              <option value="gemini">Google Gemini</option>
+              <option value="gemini">Gemini</option>
               <option value="groq">Groq</option>
               <option value="openrouter">OpenRouter</option>
             </select>
           </div>
           <div class="form-group checkbox">
             <input type="checkbox" id="ia-fallback">
-            <label>Fallback Premium Automático</label>
+            <label>Fallback premium</label>
           </div>
-          <button class="btn-primary" id="btn-save-ia" style="width:100%;margin-bottom:15px;">Salvar IA Global</button>
-          
+          <button type="button" class="btn-primary" id="btn-save-ia" style="width:100%;margin-bottom:12px">Salvar IA</button>
           <div id="ia-cards-container"></div>
         </div>
       </div>
-    </div>
+    </aside>
 
-    <!-- Center Panel -->
-    <div class="editor-panel">
-      <div class="editor-tabs">
-        <button class="editor-tab active" data-tab="chat">💬 Chat (Nexus)</button>
-        <button class="editor-tab" data-tab="code">📄 Código</button>
-        <button class="editor-tab" data-tab="diff">⚖️ Diff / Patch</button>
-        <button class="editor-tab" data-tab="artifacts">📦 Artefatos</button>
-      </div>
-      <div class="editor-content">
-        <!-- Chat Tab -->
-        <div class="tab-view active" id="view-chat">
-          <div id="devmindChat"></div>
+    <div class="resize-v" data-resize="sidebar" title="Redimensionar sidebar"></div>
+
+    <!-- Center workbench -->
+    <main class="workbench">
+      <section class="editor-area">
+        <div class="editor-toolbar">
+          <nav class="editor-breadcrumb" id="editor-breadcrumb" aria-label="Breadcrumb">
+            <span class="breadcrumb-part">Nenhum arquivo</span>
+          </nav>
+          <div class="editor-toolbar-actions">
+            <span class="save-status" id="editor-save-status">sem arquivo</span>
+            <button type="button" class="btn-primary" id="btn-save-file">Salvar</button>
+          </div>
         </div>
-        
-        <!-- Code Tab -->
-        <div class="tab-view" id="view-code">
-          <div class="code-workbench">
-            <div class="code-toolbar">
-              <div class="code-title" id="code-filename">Selecione um arquivo no Explorer</div>
-              <div style="display:flex;align-items:center;gap:8px;">
-                <span class="save-status" id="editor-save-status">sem arquivo</span>
-                <button class="btn-primary" id="btn-save-file">Salvar</button>
+        <div class="file-tabs" id="openFileTabs" role="tablist"></div>
+        <div class="monaco-shell">
+          <div id="monaco-editor"></div>
+        </div>
+      </section>
+    </main>
+
+    <div class="resize-v" data-resize="ai" title="Redimensionar painel IA"></div>
+
+    <!-- AI Panel -->
+    <aside class="ai-panel" id="ai-panel">
+      <header class="ai-panel-header">
+        <span class="ai-panel-title">Nexus AI</span>
+        <button type="button" class="icon-btn" id="btn-toggle-ai" title="Recolher painel">›</button>
+      </header>
+      <div class="ai-panel-tools">
+        <button type="button" class="btn-secondary" id="btn-use-file-context">Contexto do arquivo</button>
+      </div>
+      <div class="ai-panel-body">
+        <div id="devmindChat"></div>
+      </div>
+    </aside>
+
+    <aside class="ai-panel-collapsed" id="ai-panel-collapsed">
+      <button type="button" class="activity-btn" id="btn-expand-ai" title="Abrir Nexus AI">🤖</button>
+    </aside>
+
+    <div class="resize-h" data-resize="bottom" title="Redimensionar painel inferior"></div>
+
+    <!-- Bottom panel -->
+    <section class="bottom-panel" id="bottom-panel">
+      <div class="panel-tabs">
+        <button type="button" class="panel-tab active" data-panel="terminal">Terminal</button>
+        <button type="button" class="panel-tab" data-panel="output">Output</button>
+        <button type="button" class="panel-tab" data-panel="problems">Problems</button>
+        <button type="button" class="panel-tab" data-panel="patch">Patch Review</button>
+        <span class="panel-tab-spacer"></span>
+        <button type="button" class="icon-btn" id="btn-toggle-bottom" title="Fechar painel">✕</button>
+      </div>
+      <div class="panel-body">
+        <div class="panel-view active" id="panel-terminal">
+          <div class="terminal-body" id="terminal-output">Aguardando comandos...</div>
+        </div>
+        <div class="panel-view" id="panel-output">
+          <div class="output-body" id="output-body"></div>
+        </div>
+        <div class="panel-view" id="panel-problems">
+          <div class="problems-body" id="problems-body">
+            <div class="empty-state">Nenhum problema reportado.</div>
+          </div>
+        </div>
+        <div class="panel-view" id="panel-patch">
+          <div class="patch-panel-split">
+            <div class="patch-list-col" id="patchListSidebar">
+              <div class="empty-state">Nenhum patch pendente.</div>
+            </div>
+            <div class="patch-diff-col">
+              <div id="patch-review-empty" class="empty-state" style="margin:8px">
+                Nenhum patch pendente. Peça ao Nexus para criar ou modificar algo.
+              </div>
+              <div class="patch-review-layout" id="patch-review-layout" style="display:none">
+                <div class="patch-review-header" id="patch-review-header"></div>
+                <div class="patch-files" id="patch-review-files"></div>
+                <div class="monaco-diff-shell">
+                  <div id="monaco-diff-editor"></div>
+                </div>
+                <div id="patch-stale-alert" class="patch-stale-alert" style="display:none"></div>
+                <div class="patch-review-actions" id="patch-review-actions"></div>
               </div>
             </div>
-            <div class="file-tabs" id="openFileTabs"></div>
-            <div class="monaco-shell">
-              <div id="monaco-editor"></div>
-            </div>
           </div>
         </div>
-        
-        <!-- Diff Tab -->
-        <div class="tab-view" id="view-diff">
-          <div id="diff-content">
-            <div class="empty-state">Selecione um patch pendente para revisar.</div>
-          </div>
-        </div>
-
-        <!-- Artifacts Tab -->
-        <div class="tab-view" id="view-artifacts">
-          <div class="empty-state">Nenhum artefato gerado na sessão atual.</div>
-        </div>
       </div>
-    </div>
+    </section>
 
-    <!-- Right Panel (Preview) -->
-    <div class="preview-panel">
-      <div class="preview-header">
-        <span style="font-size:14px">🌐</span>
-        <input type="text" class="preview-url" id="preview-url" value="http://localhost:3000" placeholder="URL de preview">
-        <button class="preview-btn" id="btn-refresh-preview" title="Atualizar">🔄</button>
-        <button class="preview-btn" id="btn-open-preview" title="Abrir aba">↗️</button>
-      </div>
-      <div class="preview-content">
-        <div class="preview-empty" id="preview-placeholder">Preview inativo.<br><br>Se o projeto estiver rodando, digite a URL acima e atualize.</div>
-        <iframe id="previewFrame"></iframe>
-      </div>
-    </div>
-
-    <!-- Terminal Overlay -->
-    <div class="terminal-overlay" id="terminal-overlay">
-      <div class="terminal-header">
-        <span>Terminal / Output</span>
-        <div>
-          <button class="btn-ghost" onclick="clearTerminal()">Limpar</button>
-          <button class="btn-ghost" onclick="toggleTerminal()">Fechar</button>
-        </div>
-      </div>
-      <div class="terminal-body" id="terminal-output">Aguardando comandos...</div>
-    </div>
-
-    <!-- Status Bar -->
-    <div class="status-bar">
+    <footer class="status-bar">
       <div class="status-left">
-        <span class="status-item" id="status-mode">🤖 Modo: Carregando</span>
-        <span class="status-item" id="status-project">📂 Projeto: -</span>
+        <span class="status-item" id="status-mode">IA: —</span>
+        <span class="status-item" id="status-project">Projeto: —</span>
       </div>
       <div class="status-right">
-        <span class="status-item" onclick="toggleTerminal()">Terminal ⌨️</span>
+        <span class="status-item" id="status-cursor">Ln 1, Col 1</span>
+        <span class="status-item" id="status-terminal">Terminal</span>
         <span class="status-item" id="status-msg">Pronto</span>
       </div>
-    </div>
+    </footer>
   </div>
 
   <script src="/devmind.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.2/min/vs/loader.min.js"></script>
-  <script>
-    // App State
-    const state = {
-      project: null,
-      files: [],
-      tree: [],
-      patches: [],
-      aiConfig: null,
-      activeFile: null,
-      activePath: null,
-      openedFiles: new Map(),
-      expandedDirs: new Set([""]),
-      editor: null,
-      monacoReady: null,
-      suppressEditorChange: false,
-      saveStatus: "sem arquivo"
-    };
-
-    function $(selector) { return document.querySelector(selector); }
-    function $all(selector) { return Array.from(document.querySelectorAll(selector)); }
-    function setStatus(msg) { $('#status-msg').textContent = msg; }
-
-    // API Helpers
-    async function api(path, options = {}) {
-      try {
-        const res = await fetch(path, options);
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.error || res.statusText);
-        }
-        return await res.json();
-      } catch (err) {
-        console.error(err);
-        setStatus("Erro: " + err.message);
-        throw err;
-      }
-    }
-
-    // Navigation
-    $all('.activity-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        $all('.activity-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        $all('.side-view').forEach(v => v.classList.remove('active'));
-        $('#side-' + btn.dataset.target).classList.add('active');
-        if (btn.dataset.target === 'ia') loadIA();
-      });
-    });
-
-    $all('.editor-tab').forEach(btn => {
-      btn.addEventListener('click', () => {
-        $all('.editor-tab').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        $all('.tab-view').forEach(v => v.classList.remove('active'));
-        $('#view-' + btn.dataset.tab).classList.add('active');
-      });
-    });
-
-    function openTab(tabName) {
-      const tab = $('.editor-tab[data-tab="' + tabName + '"]');
-      if(tab) tab.click();
-    }
-
-    $('#btn-refresh-preview').onclick = () => {
-      const frame = $('#previewFrame');
-      if (frame.src) {
-        frame.src = frame.src;
-      }
-    };
-
-    $('#btn-open-preview').onclick = () => {
-      const frame = $('#previewFrame');
-      if (frame.src) {
-        window.open(frame.src, '_blank');
-      } else {
-        const url = $('#preview-url').value;
-        if (url && url.startsWith('http')) {
-          window.open(url, '_blank');
-        }
-      }
-    };
-
-    // Terminal
-    function toggleTerminal() { $('#terminal-overlay').classList.toggle('open'); }
-    function clearTerminal() { $('#terminal-output').innerHTML = ''; }
-    function logTerminal(msg) { 
-      const out = $('#terminal-output');
-      out.innerHTML += msg + '\n';
-      out.scrollTop = out.scrollHeight;
-    }
-
-    // Load Project & Files
-    async function loadHealth() {
-      const res = await api('/api/health');
-      state.project = res.project;
-      $('#status-project').textContent = '📂 Projeto: ' + (res.project?.projectName || 'Nenhum');
-      $('#status-mode').textContent = '🤖 IA: ' + (res.mode || 'Auto');
-      if (res.project?.projectPath) {
-        loadFiles(res.project.projectPath);
-      }
-    }
-
-    async function loadFiles(projectPath) {
-      try {
-        const [projRes, stagedRes] = await Promise.all([
-          api('/api/project/tree?projectRoot=' + encodeURIComponent(projectPath)),
-          api('/api/staged-files')
-        ]);
-        
-        state.tree = projRes.tree || projRes.data || [];
-        state.files = flattenTree(state.tree);
-        state.stagedFiles = stagedRes.data || [];
-        renderFileTree();
-      } catch(e) {
-        $('#fileTree').innerHTML = '<div class="empty-state">Falha ao ler arquivos</div>';
-      }
-    }
-
-    function flattenTree(nodes, files = []) {
-      (nodes || []).forEach(node => {
-        if (node.type === 'file') files.push(node);
-        if (node.children?.length) flattenTree(node.children, files);
-      });
-      return files;
-    }
-
-    function basename(filePath) {
-      return String(filePath || '').split('/').pop() || filePath;
-    }
-
-    function dirname(filePath) {
-      const parts = String(filePath || '').split('/');
-      parts.pop();
-      return parts.join('/');
-    }
-
-    function renderFileTree() {
-      const tree = $('#fileTree');
-      tree.innerHTML = '';
-      if(!state.tree.length && !state.stagedFiles?.length) {
-        tree.innerHTML = '<div class="empty-state">Nenhum arquivo encontrado</div>';
-        return;
-      }
-
-      (state.stagedFiles || []).forEach(f => {
-        const div = document.createElement('div');
-        div.className = 'tree-row';
-        div.style.paddingLeft = '6px';
-        div.innerHTML = `<span>◇</span><span class="tree-label">${escapeHtml(f.path)}</span><span class="badge ok">Staged</span>`;
-        div.onclick = () => {
-          $all('.tree-row').forEach(el => el.classList.remove('active'));
-          div.classList.add('active');
-          openFile(f.path, f);
-        };
-        tree.appendChild(div);
-      });
-
-      function renderNode(node, depth) {
-        const div = document.createElement('div');
-        const isFolder = node.type === 'directory';
-        const isExpanded = state.expandedDirs.has(node.path || '');
-        div.className = `tree-row ${isFolder ? 'folder' : 'file'} ${state.activePath === node.path ? 'active' : ''}`;
-        div.style.paddingLeft = `${6 + depth * 12}px`;
-        const dirtyMark = state.openedFiles.get(node.path)?.dirty ? '*' : '';
-        div.innerHTML = `
-          <span>${isFolder ? (isExpanded ? '▾' : '▸') : '·'}</span>
-          <span class="tree-label">${escapeHtml(node.name || node.path)}${dirtyMark}</span>
-          <span class="tree-actions">
-            <button class="tree-action" data-action="rename" title="Renomear">ren</button>
-            <button class="tree-action" data-action="delete" title="Deletar">del</button>
-          </span>
-        `;
-        div.onclick = () => {
-          $all('.tree-row').forEach(el => el.classList.remove('active'));
-          div.classList.add('active');
-          if (isFolder) {
-            if (isExpanded) state.expandedDirs.delete(node.path);
-            else state.expandedDirs.add(node.path);
-            renderFileTree();
-            return;
-          }
-          openFile(node.path);
-        };
-        div.querySelectorAll('[data-action]').forEach(btn => {
-          btn.addEventListener('click', event => {
-            event.stopPropagation();
-            if (btn.dataset.action === 'rename') renameTreePath(node.path);
-            if (btn.dataset.action === 'delete') deleteTreePath(node.path, node.type);
-          });
-        });
-        tree.appendChild(div);
-
-        if (isFolder && isExpanded) {
-          (node.children || []).forEach(child => renderNode(child, depth + 1));
-        }
-      }
-
-      (state.tree || []).forEach(node => renderNode(node, 0));
-    }
-
-    function detectLanguage(filePath) {
-      const ext = String(filePath || '').toLowerCase().split('.').pop();
-      return ({
-        ts: 'typescript',
-        tsx: 'typescript',
-        js: 'javascript',
-        jsx: 'javascript',
-        json: 'json',
-        html: 'html',
-        css: 'css',
-        md: 'markdown',
-        py: 'python'
-      })[ext] || 'plaintext';
-    }
-
-    function ensureMonaco() {
-      if (state.monacoReady) return state.monacoReady;
-      state.monacoReady = new Promise((resolve, reject) => {
-        const fail = () => {
-          const message = 'Monaco Editor não carregou. Verifique internet ou use build local no próximo passo.';
-          updateSaveStatus('erro');
-          $('#code-filename').textContent = message;
-          setStatus(message);
-          reject(new Error(message));
-        };
-        if (!window.require) {
-          fail();
-          return;
-        }
-        require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.2/min/vs' } });
-        require(['vs/editor/editor.main'], () => {
-          state.editor = monaco.editor.create($('#monaco-editor'), {
-            value: '',
-            language: 'plaintext',
-            theme: 'vs-dark',
-            automaticLayout: true,
-            minimap: { enabled: false },
-            fontSize: 13,
-            wordWrap: 'on',
-            scrollBeyondLastLine: false
-          });
-          state.editor.onDidChangeModelContent(() => {
-            if (state.suppressEditorChange || !state.activePath) return;
-            const doc = state.openedFiles.get(state.activePath);
-            if (!doc) return;
-            doc.content = state.editor.getValue();
-            doc.dirty = doc.content !== doc.savedContent;
-            updateSaveStatus(doc.dirty ? 'modificado' : 'salvo');
-            renderOpenFileTabs();
-            renderFileTree();
-          });
-          resolve(state.editor);
-        }, fail);
-      });
-      return state.monacoReady;
-    }
-
-    function updateSaveStatus(status) {
-      state.saveStatus = status;
-      const el = $('#editor-save-status');
-      if (!el) return;
-      el.textContent = status;
-      el.className = 'save-status';
-      if (status === 'modificado') el.classList.add('modified');
-      if (status === 'salvo') el.classList.add('saved');
-      if (status === 'erro') el.classList.add('error');
-    }
-
-    async function openDocument(filePath, content, options = {}) {
-      await ensureMonaco();
-      const existing = state.openedFiles.get(filePath);
-      if (existing) {
-        setActiveDocument(filePath);
-        return existing;
-      }
-      const doc = {
-        path: filePath,
-        content,
-        savedContent: content,
-        language: detectLanguage(filePath),
-        dirty: false,
-        stagedFile: options.stagedFile || null
-      };
-      state.openedFiles.set(filePath, doc);
-      setActiveDocument(filePath);
-      return doc;
-    }
-
-    function setActiveDocument(filePath) {
-      const doc = state.openedFiles.get(filePath);
-      if (!doc || !state.editor) return;
-      state.activePath = filePath;
-      state.activeFile = doc;
-      state.suppressEditorChange = true;
-      monaco.editor.setModelLanguage(state.editor.getModel(), doc.language);
-      state.editor.setValue(doc.content || '');
-      state.suppressEditorChange = false;
-      $('#code-filename').textContent = `${doc.path}${doc.dirty ? ' *' : ''}`;
-      updateSaveStatus(doc.dirty ? 'modificado' : 'salvo');
-      renderOpenFileTabs();
-      renderFileTree();
-      setTimeout(() => state.editor.layout(), 20);
-    }
-
-    function renderOpenFileTabs() {
-      const root = $('#openFileTabs');
-      if (!root) return;
-      if (!state.openedFiles.size) {
-        root.innerHTML = '<div class="file-tab active"><span class="file-tab-name">Nenhum arquivo aberto</span></div>';
-        return;
-      }
-      root.innerHTML = Array.from(state.openedFiles.values()).map(doc => `
-        <button class="file-tab ${doc.path === state.activePath ? 'active' : ''}" data-open-path="${escapeHtml(doc.path)}">
-          <span class="file-tab-name">${escapeHtml(basename(doc.path))}${doc.dirty ? ' *' : ''}</span>
-          <span class="file-tab-close" data-close-path="${escapeHtml(doc.path)}">x</span>
-        </button>
-      `).join('');
-      root.querySelectorAll('[data-open-path]').forEach(tab => {
-        tab.addEventListener('click', () => setActiveDocument(tab.dataset.openPath));
-      });
-      root.querySelectorAll('[data-close-path]').forEach(btn => {
-        btn.addEventListener('click', event => {
-          event.stopPropagation();
-          closeFileTab(btn.dataset.closePath);
-        });
-      });
-    }
-
-    function closeFileTab(filePath) {
-      const doc = state.openedFiles.get(filePath);
-      if (!doc) return;
-      if (doc.dirty && !confirm(`O arquivo ${filePath} foi modificado. Fechar sem salvar?`)) {
-        return;
-      }
-      state.openedFiles.delete(filePath);
-      if (state.activePath === filePath) {
-        const next = Array.from(state.openedFiles.keys())[0];
-        if (next) setActiveDocument(next);
-        else {
-          state.activePath = null;
-          state.activeFile = null;
-          if (state.editor) state.editor.setValue('');
-          $('#code-filename').textContent = 'Selecione um arquivo no Explorer';
-          updateSaveStatus('sem arquivo');
-          renderOpenFileTabs();
-          renderFileTree();
-        }
-      } else {
-        renderOpenFileTabs();
-        renderFileTree();
-      }
-    }
-
-    function isPathInsideFolder(filePath, folderPath) {
-      return filePath === folderPath || filePath.startsWith(folderPath + '/');
-    }
-
-    function clearEditorIfNoActiveFile() {
-      state.activePath = null;
-      state.activeFile = null;
-      if (state.editor) state.editor.setValue('');
-      $('#code-filename').textContent = 'Selecione um arquivo no Explorer';
-      updateSaveStatus('sem arquivo');
-    }
-
-    async function saveActiveFile() {
-      const doc = state.openedFiles.get(state.activePath);
-      if (!doc) return;
-      if (doc.stagedFile) {
-        setStatus('Arquivos staged devem ser aplicados pelo Patch Review.');
-        return;
-      }
-      try {
-        updateSaveStatus('salvando');
-        const content = state.editor ? state.editor.getValue() : doc.content;
-        const res = await api('/api/project/file', {
-          method: 'PUT',
-          headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({
-            projectRoot: state.project?.projectPath || '.',
-            path: doc.path,
-            content
-          })
-        });
-        doc.content = content;
-        doc.savedContent = res.data?.content ?? content;
-        doc.dirty = false;
-        updateSaveStatus('salvo');
-        setStatus('Arquivo salvo: ' + doc.path);
-        renderOpenFileTabs();
-        renderFileTree();
-      } catch (error) {
-        updateSaveStatus('erro');
-        setStatus('Erro ao salvar: ' + error.message);
-      }
-    }
-
-    async function openFile(filePath, stagedFile = null) {
-      if(!state.project && !stagedFile) return;
-      openTab('code');
-      $('#code-filename').textContent = 'Carregando ' + filePath + '...';
-      try {
-        if (stagedFile) {
-          const res = await api('/api/staged-files/' + stagedFile.id);
-          const sf = res.data;
-          await openDocument(filePath, sf.content, { stagedFile: sf });
-          if (filePath.endsWith('.html')) {
-            $('#preview-url').value = 'Preview Gerado';
-            $('#preview-placeholder').style.display = 'none';
-            const frame = $('#previewFrame');
-            frame.style.display = 'block';
-            frame.src = `/preview/staged/${sf.run_id}/index.html`;
-          }
-          return;
-        }
-        const res = await api('/api/project/file?projectRoot=' + encodeURIComponent(state.project.projectPath) + '&filePath=' + encodeURIComponent(filePath));
-        await openDocument(filePath, res.content || res.data?.content || '');
-      } catch(e) {
-        setStatus('Falha ao carregar conteudo: ' + e.message);
-      }
-    }
-
-    window.changeStagedVersion = async function(id) {
-      const vid = $('#staged-version-select').value;
-      const res = await api('/api/staged-files/' + id);
-      const version = res.data.versions.find(v => v.version_id === vid);
-      if (version) {
-        if (state.editor) state.editor.setValue(version.content);
-      }
-    };
-
-    window.copyStagedCode = function() {
-      const code = state.editor ? state.editor.getValue() : '';
-      navigator.clipboard.writeText(code);
-      setStatus("Código copiado!");
-    };
-
-    window.downloadStagedCode = function(filename) {
-      const code = state.editor ? state.editor.getValue() : '';
-      const blob = new Blob([code], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename.split('/').pop() || 'codigo.txt';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    };
-    window.compareStagedVersion = async function(id) {
-      openTab('diff');
-      const res = await api('/api/staged-files/' + id);
-      const sf = res.data;
-      const versions = sf.versions;
-      if (versions.length < 2) {
-        $('#diff-content').innerHTML = '<div class="empty-state">Histórico com menos de 2 versões. Não é possível comparar.</div>';
-        return;
-      }
-      
-      const vCurrent = versions[versions.length - 1];
-      const vPrev = versions[versions.length - 2];
-      
-      let html = `
-        <div style="margin-bottom:15px;display:flex;justify-content:space-between;align-items:center;">
-          <h3 style="margin:0">Comparando Versões de ${sf.path}</h3>
-          <div>
-            <button class="btn-primary" onclick="restoreVersion('${sf.id}', '${vPrev.version_id}')">Restaurar Anterior (v${versions.length - 1})</button>
-          </div>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-          <div><div style="font-size:11px;color:var(--red);margin-bottom:5px">Versão Anterior (v${versions.length - 1})</div>
-            <pre class="code-view" style="background:#201313;padding:10px;border-radius:6px;border:1px solid var(--red);opacity:0.8;max-height:500px;overflow:auto;">${escapeHtml(vPrev.content)}</pre>
-          </div>
-          <div><div style="font-size:11px;color:var(--green);margin-bottom:5px">Versão Atual (v${versions.length})</div>
-            <pre class="code-view" style="background:#13201f;padding:10px;border-radius:6px;border:1px solid var(--green);max-height:500px;overflow:auto;">${escapeHtml(vCurrent.content)}</pre>
-          </div>
-        </div>
-      `;
-      $('#diff-content').innerHTML = html;
-    };
-
-    window.restoreVersion = async function(id, versionId) {
-      try {
-        await api('/api/staged-files/' + id + '/restore', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({ version_id: versionId })
-        });
-        setStatus("Versão restaurada com sucesso!");
-        const res = await api('/api/staged-files/' + id);
-        openFile(res.data.path, res.data);
-      } catch (err) {
-        alert("Erro ao restaurar: " + err.message);
-      }
-    };
-    window.applyStaged = async function(id, runTest = false) {
-      try {
-        await api('/api/staged-files/' + id + '/apply', { method: 'POST' });
-        setStatus("Arquivo aplicado com sucesso");
-        if (state.project) loadFiles(state.project.projectPath);
-        
-        if (runTest) {
-          setStatus("Rodando typecheck...");
-          logTerminal(">> npm run typecheck");
-          toggleTerminal();
-          const cmdRes = await api('/api/commands/run', {
-            method: 'POST',
-            headers: {'Content-Type':'application/json'},
-            body: JSON.stringify({ commandId: "typecheck" })
-          }).catch(e => ({ error: e.message }));
-          
-          if (cmdRes.error) {
-             logTerminal("Erro ao executar: " + cmdRes.error);
-             const btn = `<button class="btn-primary" style="margin-top:10px" onclick="$('#devmindChat input').value='Corrija o erro do typecheck'; $('#devmindChat form button').click()">Corrigir com Nexus</button>`;
-             $('#terminal-output').innerHTML += '<br>' + btn + '<br>';
-          } else {
-             logTerminal(cmdRes.result?.stdout || "");
-             logTerminal(cmdRes.result?.stderr || "");
-             if (cmdRes.result?.exitCode !== 0) {
-               const btn = `<button class="btn-primary" style="margin-top:10px" onclick="$('#devmindChat input').value='Corrija o erro no código'; $('#devmindChat form button').click()">Corrigir com Nexus</button>`;
-               $('#terminal-output').innerHTML += '<br>' + btn + '<br>';
-             } else {
-               logTerminal(">> Sucesso!");
-             }
-          }
-        }
-      } catch(e) { alert("Erro ao aplicar: " + e.message); }
-    };
-
-    window.rejectStaged = async function(id) {
-      try {
-        await api('/api/staged-files/' + id + '/reject', { method: 'POST' });
-        setStatus("Staged file removido");
-        $('#code-filename').textContent = 'Selecione um arquivo';
-        if (state.activePath) closeFileTab(state.activePath);
-        if (state.project) loadFiles(state.project.projectPath);
-      } catch(e) { alert("Erro ao descartar: " + e.message); }
-    };
-
-    async function createProjectFile() {
-      const filePath = prompt('Novo arquivo (ex: src/example.ts):');
-      if (!filePath) return;
-      try {
-        await api('/api/project/file', {
-          method: 'POST',
-          headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({ projectRoot: state.project?.projectPath || '.', path: filePath, content: '' })
-        });
-        state.expandedDirs.add(dirname(filePath));
-        await loadFiles(state.project.projectPath);
-        await openFile(filePath);
-        setStatus('Arquivo criado: ' + filePath);
-      } catch (error) {
-        alert('Erro ao criar arquivo: ' + error.message);
-      }
-    }
-
-    async function createProjectFolderFromPrompt() {
-      const folderPath = prompt('Nova pasta (ex: src/components):');
-      if (!folderPath) return;
-      try {
-        await api('/api/project/folder', {
-          method: 'POST',
-          headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({ projectRoot: state.project?.projectPath || '.', path: folderPath })
-        });
-        state.expandedDirs.add(dirname(folderPath));
-        await loadFiles(state.project.projectPath);
-        setStatus('Pasta criada: ' + folderPath);
-      } catch (error) {
-        alert('Erro ao criar pasta: ' + error.message);
-      }
-    }
-
-    async function renameTreePath(oldPath) {
-      const newPath = prompt('Novo caminho:', oldPath);
-      if (!newPath || newPath === oldPath) return;
-      try {
-        await api('/api/project/rename', {
-          method: 'PUT',
-          headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({ projectRoot: state.project?.projectPath || '.', oldPath, newPath })
-        });
-        const renamedEntries = [];
-        state.openedFiles.forEach((doc, filePath) => {
-          if (filePath === oldPath || isPathInsideFolder(filePath, oldPath)) {
-            renamedEntries.push([filePath, filePath === oldPath ? newPath : newPath + filePath.slice(oldPath.length)]);
-          }
-        });
-        renamedEntries.forEach(([from, to]) => {
-          const doc = state.openedFiles.get(from);
-          if (!doc) return;
-          state.openedFiles.delete(from);
-          doc.path = to;
-          doc.language = detectLanguage(to);
-          state.openedFiles.set(to, doc);
-          if (state.activePath === from) state.activePath = to;
-        });
-        if (state.activePath) setActiveDocument(state.activePath);
-        await loadFiles(state.project.projectPath);
-        renderOpenFileTabs();
-        setStatus('Renomeado: ' + newPath);
-      } catch (error) {
-        alert('Erro ao renomear: ' + error.message);
-      }
-    }
-
-    async function deleteTreePath(targetPath, type) {
-      const label = type === 'directory' ? 'pasta' : 'arquivo';
-      if (type === 'directory') {
-        const dirtyChildren = Array.from(state.openedFiles.values())
-          .filter(doc => isPathInsideFolder(doc.path, targetPath) && doc.dirty)
-          .map(doc => doc.path);
-        if (dirtyChildren.length) {
-          const message = `A pasta contem arquivos modificados abertos:\n\n${dirtyChildren.join('\n')}\n\nDeletar mesmo assim e perder alteracoes nao salvas?`;
-          if (!confirm(message)) return;
-        }
-      }
-      if (!confirm(`Deletar ${label} ${targetPath}? Esta acao nao pode ser desfeita pelo Nexus.`)) return;
-      try {
-        const endpoint = type === 'directory' ? '/api/project/folder' : '/api/project/file';
-        const confirmQuery = type === 'directory' ? '&confirm=true' : '';
-        await api(`${endpoint}?projectRoot=${encodeURIComponent(state.project?.projectPath || '.')}&path=${encodeURIComponent(targetPath)}${confirmQuery}`, {
-          method: 'DELETE'
-        });
-        if (type === 'directory') {
-          Array.from(state.openedFiles.keys()).forEach(filePath => {
-            if (isPathInsideFolder(filePath, targetPath)) state.openedFiles.delete(filePath);
-          });
-          if (state.activePath && isPathInsideFolder(state.activePath, targetPath)) clearEditorIfNoActiveFile();
-        } else if (state.openedFiles.has(targetPath)) {
-          state.openedFiles.delete(targetPath);
-          if (state.activePath === targetPath) {
-            clearEditorIfNoActiveFile();
-          }
-        }
-        await loadFiles(state.project.projectPath);
-        renderOpenFileTabs();
-        setStatus(`${label} deletado: ${targetPath}`);
-      } catch (error) {
-        alert('Erro ao deletar: ' + error.message);
-      }
-    }
-
-    $('#btn-refresh-tree').addEventListener('click', () => state.project && loadFiles(state.project.projectPath));
-    $('#btn-new-file').addEventListener('click', createProjectFile);
-    $('#btn-new-folder').addEventListener('click', createProjectFolderFromPrompt);
-    $('#btn-save-file').addEventListener('click', saveActiveFile);
-    document.addEventListener('keydown', event => {
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
-        event.preventDefault();
-        saveActiveFile();
-      }
-    });
-
-    function summarizeProjectTree(nodes, depth = 0, lines = []) {
-      if (lines.length >= 80) return lines;
-      (nodes || []).forEach(node => {
-        if (lines.length >= 80) return;
-        lines.push(`${'  '.repeat(depth)}- ${node.path}`);
-        if (node.type === 'directory') summarizeProjectTree(node.children || [], depth + 1, lines);
-      });
-      return lines;
-    }
-
-    function buildIDEContext() {
-      const activeDoc = state.activePath ? state.openedFiles.get(state.activePath) : null;
-      const activeContent = activeDoc
-        ? (state.editor && state.activePath === activeDoc.path ? state.editor.getValue() : activeDoc.content)
-        : '';
-      return [
-        `Arquivo ativo: ${activeDoc?.path || 'nenhum'}`,
-        `Arquivo modificado: ${activeDoc?.dirty ? 'sim' : 'nao'}`,
-        `Arquivos abertos: ${Array.from(state.openedFiles.keys()).join(', ') || 'nenhum'}`,
-        '',
-        'Conteudo atual do arquivo ativo:',
-        activeContent.slice(0, 6000),
-        activeContent.length > 6000 ? '\n...[conteudo truncado pela IDE]' : '',
-        '',
-        'Arvore resumida do projeto:',
-        summarizeProjectTree(state.tree).join('\n')
-      ].join('\n');
-    }
-
-    window.NexusIDE = {
-      openFile,
-      saveActiveFile,
-      buildIDEContext,
-      setActiveContent(content) {
-        if (state.editor) state.editor.setValue(String(content || ''));
-      },
-      getActiveFile() {
-        const doc = state.activePath ? state.openedFiles.get(state.activePath) : null;
-        return doc ? {
-          path: doc.path,
-          dirty: doc.dirty,
-          content: state.editor ? state.editor.getValue() : doc.content
-        } : null;
-      },
-      getOpenFiles() {
-        return Array.from(state.openedFiles.values()).map(doc => ({ path: doc.path, dirty: doc.dirty }));
-      }
-    };
-
-    // DevMind Init
-    if (window.DevMind) {
-      window.DevMind.init({
-        apiBase: '',
-        containerId: 'devmindChat',
-        getContext: buildIDEContext,
-        onSuccess: (data) => {
-          if (state.project) loadFiles(state.project.projectPath);
-          
-          if (data.patch_ids && data.patch_ids.length > 0) {
-            loadPatches();
-          }
-          
-          // Se for uma tarefa de construção e criou staged files, vá para o código
-          setTimeout(() => {
-            if (state.stagedFiles && state.stagedFiles.length > 0) {
-              $('.activity-btn[data-target="explorer"]').click();
-              openFile(state.stagedFiles[0].path, state.stagedFiles[0]);
-            }
-          }, 500);
-        }
-      });
-    }
-
-     // Patches
-     async function loadPatches() {
-       try {
-         const res = await api('/api/patches/pending');
-         const planPatch = (res.patches || []).find(p => p.reason === "++PLAN_PROPOSAL++");
-         state.patches = (res.patches || []).filter(p => p.reason !== "++PLAN_PROPOSAL++");
-         
-         if (planPatch) {
-           if (window.DevMind) {
-             window.DevMind.showPlan(planPatch);
-           }
-           // Rejeita o plano para removê-lo da fila segura de patches
-           await api('/api/patches/reject', {
-             method: 'POST',
-             headers: {'Content-Type': 'application/json'},
-             body: JSON.stringify({ actionIds: [planPatch.id] })
-           }).catch(() => {});
-         }
-
-         $('#act-patches').dataset.count = state.patches.length;
-         renderPatchSidebar();
-       } catch(e) {
-         console.error("Falha ao ler patches", e);
-       }
-     }
-
-    function renderPatchSidebar() {
-      const list = $('#patchListSidebar');
-      if(!state.patches.length) {
-        list.innerHTML = '<div class="empty-state">Nenhum patch.</div>';
-        $('#diff-content').innerHTML = '<div class="empty-state">Selecione um patch.</div>';
-        return;
-      }
-      list.innerHTML = state.patches.map(p => `
-        <div class="card" style="cursor:pointer;padding:10px;" onclick="viewPatch('${p.id}')">
-          <div style="font-weight:bold;font-size:12px;margin-bottom:4px;">${p.type}</div>
-          <div style="font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.path || p.reason}</div>
-        </div>
-      `).join('');
-    }
-
-    window.viewPatch = async function(id) {
-      openTab('diff');
-      const patch = state.patches.find(p => p.id === id);
-      if(!patch) return;
-      
-      let html = `
-        <div style="margin-bottom:15px;display:flex;justify-content:space-between;">
-          <h3 style="margin:0">Patch: ${patch.type}</h3>
-          <div>
-            <button class="btn-primary" onclick="applyPatch('${id}')">Aplicar</button>
-            <button class="btn-ghost" style="color:var(--red)" onclick="rejectPatch('${id}')">Rejeitar</button>
-          </div>
-        </div>
-        <div style="font-size:13px;margin-bottom:10px;">Arquivo: ${patch.path || '-'}</div>
-      `;
-
-      if (patch.type === 'create_file' || patch.type === 'write_file') {
-        html += `<pre class="code-view" style="background:#13201f;padding:10px;border-radius:6px;border:1px solid var(--green)">${escapeHtml(patch.content || '')}</pre>`;
-      } else if (patch.type === 'patch_file') {
-        html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-          <div><div style="font-size:11px;color:var(--red);margin-bottom:5px">Antes</div>
-            <pre class="code-view" style="background:#201313;padding:10px;border-radius:6px;border:1px solid var(--red);opacity:0.8">${escapeHtml(patch.before || '')}</pre>
-          </div>
-          <div><div style="font-size:11px;color:var(--green);margin-bottom:5px">Depois</div>
-            <pre class="code-view" style="background:#13201f;padding:10px;border-radius:6px;border:1px solid var(--green)">${escapeHtml(patch.after || '')}</pre>
-          </div>
-        </div>`;
-      } else {
-        html += `<pre class="code-view">${JSON.stringify(patch, null, 2)}</pre>`;
-      }
-
-      $('#diff-content').innerHTML = html;
-    };
-
-    window.applyPatch = async function(id) {
-      try {
-        await api(`/api/patches/pending/${id}/apply`, { method: 'POST' });
-        setStatus("Patch aplicado com sucesso!");
-        $('#diff-content').innerHTML = '<div class="empty-state">Patch aplicado.</div>';
-        loadPatches();
-        if (state.project) loadFiles(state.project.projectPath);
-      } catch(e) {}
-    };
-
-    window.rejectPatch = async function(id) {
-      try {
-        await api(`/api/patches/pending/${id}`, { method: 'DELETE' });
-        setStatus("Patch rejeitado.");
-        $('#diff-content').innerHTML = '<div class="empty-state">Patch rejeitado.</div>';
-        loadPatches();
-      } catch(e) {}
-    };
-
-    function escapeHtml(s) {
-      return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-    }
-
-    // Preview
-    $('#btn-refresh-preview').addEventListener('click', () => {
-      const frame = $('#previewFrame');
-      const ph = $('#preview-placeholder');
-      const url = $('#preview-url').value;
-      if (url) {
-        ph.style.display = 'none';
-        frame.style.display = 'block';
-        frame.src = url;
-      }
-    });
-
-    $('#btn-open-preview').addEventListener('click', () => {
-      const url = $('#preview-url').value;
-      if (url) window.open(url, '_blank');
-    });
-
-    // IA Settings
-    async function loadIA() {
-      try {
-        const data = await api('/api/ai/settings');
-        state.aiConfig = data;
-        $('#ia-mode').value = data.mode || 'balanced';
-        $('#ia-provider').value = data.provider || 'auto';
-        $('#ia-fallback').checked = data.allowPremiumFallback;
-
-        const PROVIDERS = [
-          { id:"anthropic",  name:"Claude / Anthropic",  keyLabel:"API Key",   keyPh:"sk-ant-...",    modelPh:"claude-sonnet-4-20250514" },
-          { id:"openai",     name:"OpenAI",              keyLabel:"API Key",   keyPh:"sk-...",         modelPh:"gpt-4.1" },
-          { id:"gemini",     name:"Google Gemini",       keyLabel:"API Key",   keyPh:"AIza...",        modelPh:"gemini-2.5-pro" },
-          { id:"groq",       name:"Groq",               keyLabel:"API Key",   keyPh:"gsk_...",        modelPh:"llama-3.3-70b-versatile" },
-          { id:"openrouter", name:"OpenRouter",          keyLabel:"API Key",   keyPh:"sk-or-...",      modelPh:"anthropic/claude-sonnet-4" },
-          { id:"ollama",     name:"Ollama local",        keyLabel:"Base URL",  keyPh:"http://localhost:11434", modelPh:"qwen2.5-coder:7b", isLocal:true }
-        ];
-
-        $('#ia-cards-container').innerHTML = PROVIDERS.map(p => {
-          const cfg = data.providers?.[p.id] || {};
-          const st = cfg.configured ? "ok" : "miss";
-          const stLabel = cfg.configured ? "✓ Configurado" : "Ausente";
-          const keyVal = cfg.keyPreview || cfg.baseUrl || "";
-          return `
-          <div class="card" style="padding:12px;">
-            <div class="card-title">${p.name} <span class="badge ${st}" id="badge-${p.id}">${stLabel}</span></div>
-            <div class="form-group" style="margin-bottom:8px">
-              <input type="text" id="key-${p.id}" placeholder="${keyVal || p.keyPh}" style="margin-bottom:6px">
-              <input type="text" id="mod-${p.id}" placeholder="${p.modelPh}" value="${cfg.model || p.modelPh}">
-            </div>
-            ${p.isLocal ? `<div style="font-size:10px;color:var(--muted);margin-bottom:8px">Rode: ollama pull ${p.modelPh}</div>` : ""}
-            <div style="display:flex;gap:6px">
-              <button class="btn-primary" onclick="saveProv('${p.id}')">Salvar</button>
-              <button class="btn-secondary" onclick="testProv('${p.id}')">Testar</button>
-              <span id="msg-${p.id}" style="font-size:11px;margin-left:auto;align-self:center;color:var(--muted)"></span>
-            </div>
-          </div>`;
-        }).join('');
-
-      } catch(e) {}
-    }
-
-    $('#btn-save-ia').addEventListener('click', async () => {
-      try {
-        await api('/api/ai/settings', {
-          method: 'POST',
-          headers: {'Content-Type':'application/json'},
-          body: JSON.stringify({
-            mode: $('#ia-mode').value,
-            provider: $('#ia-provider').value,
-            allowPremiumFallback: $('#ia-fallback').checked
-          })
-        });
-        setStatus("Configurações de IA salvas!");
-      } catch(e) {}
-    });
-
-    window.saveProv = async function(id) {
-      const msg = $(`#msg-${id}`);
-      const key = $(`#key-${id}`).value;
-      const mod = $(`#mod-${id}`).value;
-      msg.textContent = "Salvando...";
-      try {
-        const body = { providers: { [id]: { model: mod || undefined } } };
-        if (id === 'ollama') body.providers[id].baseUrl = key || undefined;
-        else if (key) body.providers[id].apiKey = key;
-        
-        await api('/api/ai/settings', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
-        msg.textContent = "✓ Salvo";
-        if(key) { $(`#badge-${id}`).className = "badge ok"; $(`#badge-${id}`).textContent = "✓ Configurado"; }
-      } catch(e) { msg.textContent = "Erro"; }
-    };
-
-    window.testProv = async function(id) {
-      const msg = $(`#msg-${id}`);
-      msg.textContent = "Testando...";
-      try {
-        const res = await api('/api/ai/test-provider', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ provider: id }) });
-        msg.textContent = res.ok ? "✓ OK" : "✗ Falhou";
-      } catch(e) { msg.textContent = "✗ Erro"; }
-    };
-
-    // Boot
-    loadHealth();
-    loadPatches();
-
-  </script>
+  <script src="/layout.js"></script>
+  <script src="/editor.js"></script>
+  <script src="/explorer.js"></script>
+  <script src="/terminal.js"></script>
+  <script src="/patch-review.js"></script>
+  <script src="/ai-panel.js"></script>
+  <script src="/app.js"></script>
 </body>
 </html>
