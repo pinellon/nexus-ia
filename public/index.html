@@ -510,8 +510,15 @@ pre.code-view { margin: 0; font-size: 13px; line-height: 1.5; color: #dbe7ef; fo
     function ensureMonaco() {
       if (state.monacoReady) return state.monacoReady;
       state.monacoReady = new Promise((resolve, reject) => {
+        const fail = () => {
+          const message = 'Monaco Editor não carregou. Verifique internet ou use build local no próximo passo.';
+          updateSaveStatus('erro');
+          $('#code-filename').textContent = message;
+          setStatus(message);
+          reject(new Error(message));
+        };
         if (!window.require) {
-          reject(new Error('Monaco loader nao carregou.'));
+          fail();
           return;
         }
         require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.2/min/vs' } });
@@ -537,7 +544,7 @@ pre.code-view { margin: 0; font-size: 13px; line-height: 1.5; color: #dbe7ef; fo
             renderFileTree();
           });
           resolve(state.editor);
-        });
+        }, fail);
       });
       return state.monacoReady;
     }
@@ -636,6 +643,18 @@ pre.code-view { margin: 0; font-size: 13px; line-height: 1.5; color: #dbe7ef; fo
         renderOpenFileTabs();
         renderFileTree();
       }
+    }
+
+    function isPathInsideFolder(filePath, folderPath) {
+      return filePath === folderPath || filePath.startsWith(folderPath + '/');
+    }
+
+    function clearEditorIfNoActiveFile() {
+      state.activePath = null;
+      state.activeFile = null;
+      if (state.editor) state.editor.setValue('');
+      $('#code-filename').textContent = 'Selecione um arquivo no Explorer';
+      updateSaveStatus('sem arquivo');
     }
 
     async function saveActiveFile() {
@@ -856,13 +875,22 @@ pre.code-view { margin: 0; font-size: 13px; line-height: 1.5; color: #dbe7ef; fo
           headers: {'Content-Type':'application/json'},
           body: JSON.stringify({ projectRoot: state.project?.projectPath || '.', oldPath, newPath })
         });
-        const doc = state.openedFiles.get(oldPath);
-        if (doc) {
-          state.openedFiles.delete(oldPath);
-          doc.path = newPath;
-          state.openedFiles.set(newPath, doc);
-          if (state.activePath === oldPath) state.activePath = newPath;
-        }
+        const renamedEntries = [];
+        state.openedFiles.forEach((doc, filePath) => {
+          if (filePath === oldPath || isPathInsideFolder(filePath, oldPath)) {
+            renamedEntries.push([filePath, filePath === oldPath ? newPath : newPath + filePath.slice(oldPath.length)]);
+          }
+        });
+        renamedEntries.forEach(([from, to]) => {
+          const doc = state.openedFiles.get(from);
+          if (!doc) return;
+          state.openedFiles.delete(from);
+          doc.path = to;
+          doc.language = detectLanguage(to);
+          state.openedFiles.set(to, doc);
+          if (state.activePath === from) state.activePath = to;
+        });
+        if (state.activePath) setActiveDocument(state.activePath);
         await loadFiles(state.project.projectPath);
         renderOpenFileTabs();
         setStatus('Renomeado: ' + newPath);
@@ -873,17 +901,31 @@ pre.code-view { margin: 0; font-size: 13px; line-height: 1.5; color: #dbe7ef; fo
 
     async function deleteTreePath(targetPath, type) {
       const label = type === 'directory' ? 'pasta' : 'arquivo';
+      if (type === 'directory') {
+        const dirtyChildren = Array.from(state.openedFiles.values())
+          .filter(doc => isPathInsideFolder(doc.path, targetPath) && doc.dirty)
+          .map(doc => doc.path);
+        if (dirtyChildren.length) {
+          const message = `A pasta contem arquivos modificados abertos:\n\n${dirtyChildren.join('\n')}\n\nDeletar mesmo assim e perder alteracoes nao salvas?`;
+          if (!confirm(message)) return;
+        }
+      }
       if (!confirm(`Deletar ${label} ${targetPath}? Esta acao nao pode ser desfeita pelo Nexus.`)) return;
       try {
         const endpoint = type === 'directory' ? '/api/project/folder' : '/api/project/file';
-        await api(`${endpoint}?projectRoot=${encodeURIComponent(state.project?.projectPath || '.')}&path=${encodeURIComponent(targetPath)}`, {
+        const confirmQuery = type === 'directory' ? '&confirm=true' : '';
+        await api(`${endpoint}?projectRoot=${encodeURIComponent(state.project?.projectPath || '.')}&path=${encodeURIComponent(targetPath)}${confirmQuery}`, {
           method: 'DELETE'
         });
-        if (type !== 'directory' && state.openedFiles.has(targetPath)) {
+        if (type === 'directory') {
+          Array.from(state.openedFiles.keys()).forEach(filePath => {
+            if (isPathInsideFolder(filePath, targetPath)) state.openedFiles.delete(filePath);
+          });
+          if (state.activePath && isPathInsideFolder(state.activePath, targetPath)) clearEditorIfNoActiveFile();
+        } else if (state.openedFiles.has(targetPath)) {
           state.openedFiles.delete(targetPath);
           if (state.activePath === targetPath) {
-            state.activePath = null;
-            if (state.editor) state.editor.setValue('');
+            clearEditorIfNoActiveFile();
           }
         }
         await loadFiles(state.project.projectPath);

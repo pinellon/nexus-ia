@@ -487,8 +487,15 @@ app.put("/api/project/rename", async (req, res) => {
 app.delete("/api/project/folder", async (req, res) => {
   const targetRoot = String(req.query.projectRoot ?? ".");
   const targetPath = String(req.query.path ?? "");
+  const confirmed = String(req.query.confirm ?? "");
   if (!targetPath.trim()) {
     return res.status(400).json({ ok: false, error: "path e obrigatorio" });
+  }
+  if (confirmed !== "true") {
+    return res.status(400).json({
+      ok: false,
+      error: "confirm=true e obrigatorio para deletar pasta"
+    });
   }
 
   try {
