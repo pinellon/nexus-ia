@@ -1,4 +1,4 @@
-import { mkdir, readdir, readFile as readFsFile, rm, stat, writeFile as writeFsFile } from "node:fs/promises";
+import { mkdir, readdir, readFile as readFsFile, rename, rm, stat, writeFile as writeFsFile } from "node:fs/promises";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
@@ -58,7 +58,8 @@ export interface ProjectTreeNode {
 }
 
 function isBlockedName(value: string) {
-  return BLOCKED_NAMES.has(value.toLowerCase());
+  const normalized = value.toLowerCase();
+  return BLOCKED_NAMES.has(normalized) || normalized === ".env" || normalized.startsWith(".env.");
 }
 
 function isBlockedExtension(value: string) {
@@ -72,7 +73,7 @@ function isTextFile(value: string) {
 
 function normalizeRelativeTarget(targetPath: string) {
   const trimmed = String(targetPath || "").trim().replace(/\\/g, "/");
-  if (!trimmed || trimmed.startsWith("/") || path.isAbsolute(trimmed) || trimmed.includes("..")) {
+  if (!trimmed || trimmed === "." || trimmed.startsWith("/") || path.isAbsolute(trimmed) || trimmed.includes("..")) {
     throw new Error("Caminho invalido");
   }
   return trimmed;
@@ -273,6 +274,33 @@ export async function writeProjectFile(projectRoot: string, targetPath: string, 
   };
 }
 
+export async function createProjectFolder(projectRoot: string, targetPath: string) {
+  const { absolutePath, normalized } = resolveProjectPath(projectRoot, targetPath);
+  await mkdir(absolutePath, { recursive: false });
+  return { path: normalized };
+}
+
+export async function renameProjectPath(projectRoot: string, oldPath: string, newPath: string) {
+  const oldTarget = resolveProjectPath(projectRoot, oldPath);
+  const newTarget = resolveProjectPath(projectRoot, newPath);
+
+  try {
+    await stat(newTarget.absolutePath);
+    throw new Error("Destino ja existe");
+  } catch (error) {
+    if (error instanceof Error && error.message === "Destino ja existe") {
+      throw error;
+    }
+  }
+
+  await ensureParentDirectory(newTarget.absolutePath);
+  await rename(oldTarget.absolutePath, newTarget.absolutePath);
+  return {
+    oldPath: oldTarget.normalized,
+    newPath: newTarget.normalized
+  };
+}
+
 export async function deleteProjectFile(projectRoot: string, targetPath: string) {
   const { absolutePath, normalized } = resolveProjectPath(projectRoot, targetPath);
   const info = await stat(absolutePath);
@@ -282,6 +310,18 @@ export async function deleteProjectFile(projectRoot: string, targetPath: string)
   }
 
   await rm(absolutePath, { force: false });
+  return { path: normalized };
+}
+
+export async function deleteProjectFolder(projectRoot: string, targetPath: string) {
+  const { absolutePath, normalized } = resolveProjectPath(projectRoot, targetPath);
+  const info = await stat(absolutePath);
+
+  if (!info.isDirectory()) {
+    throw new Error("Apenas pastas podem ser removidas por este endpoint");
+  }
+
+  await rm(absolutePath, { recursive: true, force: false });
   return { path: normalized };
 }
 

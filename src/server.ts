@@ -26,7 +26,17 @@ import {
   readProjectSnapshot,
   scanProject
 } from "./project-inspector.js";
-import { listProjectFiles, readProjectFile, writeProjectFile } from "./project-file-store.js";
+import {
+  createProjectFolder,
+  deleteProjectFile,
+  deleteProjectFolder,
+  listProjectFiles,
+  listProjectTree,
+  projectFileExists,
+  readProjectFile,
+  renameProjectPath,
+  writeProjectFile
+} from "./project-file-store.js";
 import { readLastCommandResult, saveLastCommandResult } from "./project-runtime-store.js";
 import {
   fetchUrl,
@@ -313,6 +323,24 @@ app.get("/api/project/files", async (req, res) => {
   }
 });
 
+app.get("/api/project/tree", async (req, res) => {
+  const targetRoot = String(req.query.projectRoot ?? ".");
+
+  try {
+    const tree = await listProjectTree(targetRoot);
+    return res.json({
+      ok: true,
+      tree,
+      data: tree
+    });
+  } catch (error) {
+    return res.status(400).json({
+      ok: false,
+      error: error instanceof Error ? error.message : "Falha ao listar arvore do projeto"
+    });
+  }
+});
+
 app.get("/api/project/file", async (req, res) => {
   const targetRoot = String(req.query.projectRoot ?? ".");
   const targetPath = String(req.query.path ?? req.query.filePath ?? "");
@@ -336,21 +364,142 @@ app.get("/api/project/file", async (req, res) => {
   }
 });
 
-app.put("/api/project/file", async (req, res) => {
-  const { path: targetPath, content = "" } = req.body as { path?: string; content?: string };
+app.post("/api/project/file", async (req, res) => {
+  const {
+    projectRoot: targetRoot = ".",
+    path: targetPath,
+    content = ""
+  } = req.body as { projectRoot?: string; path?: string; content?: string };
   if (!targetPath?.trim()) {
+    return res.status(400).json({ ok: false, error: "path e obrigatorio" });
+  }
+
+  try {
+    if (await projectFileExists(targetRoot, targetPath)) {
+      return res.status(409).json({ ok: false, error: "Arquivo ja existe" });
+    }
+    const file = await writeProjectFile(targetRoot, targetPath, content);
+    return res.status(201).json({
+      ok: true,
+      data: file,
+      path: file.path,
+      content: file.content
+    });
+  } catch (error) {
+    return res.status(400).json({
+      ok: false,
+      error: error instanceof Error ? error.message : "Falha ao criar arquivo do projeto"
+    });
+  }
+});
+
+app.put("/api/project/file", async (req, res) => {
+  const {
+    projectRoot: targetRoot = ".",
+    path: targetPath,
+    content = ""
+  } = req.body as { projectRoot?: string; path?: string; content?: string };
+  if (!targetPath?.trim()) {
+    return res.status(400).json({ ok: false, error: "path e obrigatorio" });
+  }
+
+  try {
+    const file = await writeProjectFile(targetRoot, targetPath, content);
+    return res.json({
+      ok: true,
+      data: file,
+      path: file.path,
+      content: file.content
+    });
+  } catch (error) {
+    return res.status(400).json({
+      ok: false,
+      error: error instanceof Error ? error.message : "Falha ao salvar arquivo do projeto"
+    });
+  }
+});
+
+app.delete("/api/project/file", async (req, res) => {
+  const targetRoot = String(req.query.projectRoot ?? ".");
+  const targetPath = String(req.query.path ?? req.query.filePath ?? "");
+  if (!targetPath.trim()) {
     return res.status(400).json({ ok: false, error: "path e obrigatorio" });
   }
 
   try {
     return res.json({
       ok: true,
-      data: await writeProjectFile(".", targetPath, content)
+      data: await deleteProjectFile(targetRoot, targetPath)
     });
   } catch (error) {
     return res.status(400).json({
       ok: false,
-      error: error instanceof Error ? error.message : "Falha ao salvar arquivo do projeto"
+      error: error instanceof Error ? error.message : "Falha ao remover arquivo do projeto"
+    });
+  }
+});
+
+app.post("/api/project/folder", async (req, res) => {
+  const {
+    projectRoot: targetRoot = ".",
+    path: targetPath
+  } = req.body as { projectRoot?: string; path?: string };
+  if (!targetPath?.trim()) {
+    return res.status(400).json({ ok: false, error: "path e obrigatorio" });
+  }
+
+  try {
+    return res.status(201).json({
+      ok: true,
+      data: await createProjectFolder(targetRoot, targetPath)
+    });
+  } catch (error) {
+    return res.status(400).json({
+      ok: false,
+      error: error instanceof Error ? error.message : "Falha ao criar pasta do projeto"
+    });
+  }
+});
+
+app.put("/api/project/rename", async (req, res) => {
+  const {
+    projectRoot: targetRoot = ".",
+    oldPath,
+    newPath
+  } = req.body as { projectRoot?: string; oldPath?: string; newPath?: string };
+  if (!oldPath?.trim() || !newPath?.trim()) {
+    return res.status(400).json({ ok: false, error: "oldPath e newPath sao obrigatorios" });
+  }
+
+  try {
+    return res.json({
+      ok: true,
+      data: await renameProjectPath(targetRoot, oldPath, newPath)
+    });
+  } catch (error) {
+    return res.status(400).json({
+      ok: false,
+      error: error instanceof Error ? error.message : "Falha ao renomear caminho do projeto"
+    });
+  }
+});
+
+app.delete("/api/project/folder", async (req, res) => {
+  const targetRoot = String(req.query.projectRoot ?? ".");
+  const targetPath = String(req.query.path ?? "");
+  if (!targetPath.trim()) {
+    return res.status(400).json({ ok: false, error: "path e obrigatorio" });
+  }
+
+  try {
+    return res.json({
+      ok: true,
+      data: await deleteProjectFolder(targetRoot, targetPath)
+    });
+  } catch (error) {
+    return res.status(400).json({
+      ok: false,
+      error: error instanceof Error ? error.message : "Falha ao remover pasta do projeto"
     });
   }
 });

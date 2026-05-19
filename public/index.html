@@ -38,6 +38,17 @@ code, pre { font-family: var(--mono); }
 .file-item:hover { background: var(--surface-2); color: var(--text); }
 .file-item.active { background: rgba(86, 214, 201, 0.1); color: var(--accent); }
 .file-item.changed { color: var(--yellow); }
+.explorer-toolbar { display: flex; gap: 4px; padding: 8px; border-bottom: 1px solid var(--line); background: var(--surface); }
+.explorer-toolbar .btn-ghost { padding: 5px 7px; border: 1px solid var(--line); }
+.tree-row { display: flex; align-items: center; gap: 5px; min-height: 24px; padding: 3px 6px; border-radius: 4px; color: var(--soft); font-size: 12px; cursor: pointer; user-select: none; }
+.tree-row:hover { background: var(--surface-2); color: var(--text); }
+.tree-row.active { background: rgba(86, 214, 201, 0.1); color: var(--accent); }
+.tree-row.folder { font-weight: 600; }
+.tree-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tree-actions { display: none; gap: 2px; }
+.tree-row:hover .tree-actions { display: flex; }
+.tree-action { padding: 1px 4px; color: var(--muted); background: transparent; border-radius: 3px; font-size: 11px; }
+.tree-action:hover { background: var(--surface-3); color: var(--text); }
 /* Center Editor */
 .editor-panel { display: flex; flex-direction: column; background: var(--bg); min-width: 0; }
 .editor-tabs { display: flex; background: var(--surface); border-bottom: 1px solid var(--line); overflow-x: auto; }
@@ -85,6 +96,21 @@ iframe#previewFrame { width: 100%; height: 100%; border: none; background: #fff;
 .empty-state { padding: 30px; text-align: center; color: var(--muted); font-size: 13px; border: 1px dashed var(--line); border-radius: 8px; }
 /* Code block */
 pre.code-view { margin: 0; font-size: 13px; line-height: 1.5; color: #dbe7ef; font-family: var(--mono); white-space: pre-wrap; }
+.code-workbench { height: 100%; display: grid; grid-template-rows: auto auto minmax(0, 1fr); padding: 0; overflow: hidden; }
+.code-toolbar { min-height: 42px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 12px; border-bottom: 1px solid var(--line); background: var(--surface); }
+.code-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--soft); font-size: 13px; font-weight: 600; }
+.save-status { color: var(--muted); font-size: 11px; font-weight: 700; text-transform: uppercase; }
+.save-status.modified { color: var(--yellow); }
+.save-status.saved { color: var(--green); }
+.save-status.error { color: var(--red); }
+.file-tabs { display: flex; min-height: 36px; overflow-x: auto; border-bottom: 1px solid var(--line); background: #0d1014; }
+.file-tab { display: inline-flex; align-items: center; gap: 8px; max-width: 220px; padding: 8px 10px; border-right: 1px solid var(--line); background: transparent; color: var(--muted); font-size: 12px; }
+.file-tab.active { background: var(--bg); color: var(--text); border-top: 2px solid var(--accent); }
+.file-tab-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-tab-close { padding: 0 4px; border-radius: 3px; color: var(--muted); background: transparent; }
+.file-tab-close:hover { background: var(--surface-3); color: var(--red); }
+.monaco-shell { min-height: 0; position: relative; }
+#monaco-editor { position: absolute; inset: 0; }
 /* Terminal Panel (Bottom overlay) */
 .terminal-overlay { position: fixed; bottom: 30px; left: 270px; right: 300px; height: 250px; background: #0d1014; border-top: 1px solid var(--line); border-left: 1px solid var(--line); border-right: 1px solid var(--line); border-radius: 8px 8px 0 0; display: none; flex-direction: column; z-index: 50; }
 .terminal-overlay.open { display: flex; }
@@ -107,6 +133,11 @@ pre.code-view { margin: 0; font-size: 13px; line-height: 1.5; color: #dbe7ef; fo
       <!-- Explorer -->
       <div class="side-view active" id="side-explorer">
         <div class="sidebar-header">Explorer</div>
+        <div class="explorer-toolbar">
+          <button class="btn-ghost" id="btn-refresh-tree" title="Atualizar">Atualizar</button>
+          <button class="btn-ghost" id="btn-new-file" title="Novo arquivo">Arquivo</button>
+          <button class="btn-ghost" id="btn-new-folder" title="Nova pasta">Pasta</button>
+        </div>
         <div class="sidebar-content file-tree" id="fileTree">
           <div style="color:var(--muted);font-size:12px;padding:10px;">Carregando arquivos...</div>
         </div>
@@ -191,8 +222,19 @@ pre.code-view { margin: 0; font-size: 13px; line-height: 1.5; color: #dbe7ef; fo
         
         <!-- Code Tab -->
         <div class="tab-view" id="view-code">
-          <h3 id="code-filename" style="margin-top:0;font-size:14px;color:var(--soft);">Selecione um arquivo no Explorer</h3>
-          <pre class="code-view" id="code-content"></pre>
+          <div class="code-workbench">
+            <div class="code-toolbar">
+              <div class="code-title" id="code-filename">Selecione um arquivo no Explorer</div>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span class="save-status" id="editor-save-status">sem arquivo</span>
+                <button class="btn-primary" id="btn-save-file">Salvar</button>
+              </div>
+            </div>
+            <div class="file-tabs" id="openFileTabs"></div>
+            <div class="monaco-shell">
+              <div id="monaco-editor"></div>
+            </div>
+          </div>
         </div>
         
         <!-- Diff Tab -->
@@ -249,14 +291,23 @@ pre.code-view { margin: 0; font-size: 13px; line-height: 1.5; color: #dbe7ef; fo
   </div>
 
   <script src="/devmind.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.2/min/vs/loader.min.js"></script>
   <script>
     // App State
     const state = {
       project: null,
       files: [],
+      tree: [],
       patches: [],
       aiConfig: null,
-      activeFile: null
+      activeFile: null,
+      activePath: null,
+      openedFiles: new Map(),
+      expandedDirs: new Set([""]),
+      editor: null,
+      monacoReady: null,
+      suppressEditorChange: false,
+      saveStatus: "sem arquivo"
     };
 
     function $(selector) { return document.querySelector(selector); }
@@ -346,11 +397,12 @@ pre.code-view { margin: 0; font-size: 13px; line-height: 1.5; color: #dbe7ef; fo
     async function loadFiles(projectPath) {
       try {
         const [projRes, stagedRes] = await Promise.all([
-          api('/api/project/files?projectRoot=' + encodeURIComponent(projectPath)),
+          api('/api/project/tree?projectRoot=' + encodeURIComponent(projectPath)),
           api('/api/staged-files')
         ]);
         
-        state.files = projRes.files || [];
+        state.tree = projRes.tree || projRes.data || [];
+        state.files = flattenTree(state.tree);
         state.stagedFiles = stagedRes.data || [];
         renderFileTree();
       } catch(e) {
@@ -358,78 +410,275 @@ pre.code-view { margin: 0; font-size: 13px; line-height: 1.5; color: #dbe7ef; fo
       }
     }
 
+    function flattenTree(nodes, files = []) {
+      (nodes || []).forEach(node => {
+        if (node.type === 'file') files.push(node);
+        if (node.children?.length) flattenTree(node.children, files);
+      });
+      return files;
+    }
+
+    function basename(filePath) {
+      return String(filePath || '').split('/').pop() || filePath;
+    }
+
+    function dirname(filePath) {
+      const parts = String(filePath || '').split('/');
+      parts.pop();
+      return parts.join('/');
+    }
+
     function renderFileTree() {
       const tree = $('#fileTree');
       tree.innerHTML = '';
-      if(!state.files.length && !state.stagedFiles?.length) {
+      if(!state.tree.length && !state.stagedFiles?.length) {
         tree.innerHTML = '<div class="empty-state">Nenhum arquivo encontrado</div>';
         return;
       }
-      
-      // Renderizar Staged Files primeiro
+
       (state.stagedFiles || []).forEach(f => {
         const div = document.createElement('div');
-        div.className = 'file-item';
-        div.innerHTML = `📄 ${f.path} <span class="badge ok" style="margin-left:auto">Staged</span>`;
+        div.className = 'tree-row';
+        div.style.paddingLeft = '6px';
+        div.innerHTML = `<span>◇</span><span class="tree-label">${escapeHtml(f.path)}</span><span class="badge ok">Staged</span>`;
         div.onclick = () => {
-          $all('.file-item').forEach(el => el.classList.remove('active'));
+          $all('.tree-row').forEach(el => el.classList.remove('active'));
           div.classList.add('active');
           openFile(f.path, f);
         };
         tree.appendChild(div);
       });
 
-      // Renderizar Arquivos do Projeto
-      state.files.forEach(f => {
-        // Pular se já estiver em staging
-        if (state.stagedFiles?.some(sf => sf.path === f.path)) return;
-        
+      function renderNode(node, depth) {
         const div = document.createElement('div');
-        div.className = 'file-item';
-        div.textContent = f.path;
+        const isFolder = node.type === 'directory';
+        const isExpanded = state.expandedDirs.has(node.path || '');
+        div.className = `tree-row ${isFolder ? 'folder' : 'file'} ${state.activePath === node.path ? 'active' : ''}`;
+        div.style.paddingLeft = `${6 + depth * 12}px`;
+        const dirtyMark = state.openedFiles.get(node.path)?.dirty ? '*' : '';
+        div.innerHTML = `
+          <span>${isFolder ? (isExpanded ? '▾' : '▸') : '·'}</span>
+          <span class="tree-label">${escapeHtml(node.name || node.path)}${dirtyMark}</span>
+          <span class="tree-actions">
+            <button class="tree-action" data-action="rename" title="Renomear">ren</button>
+            <button class="tree-action" data-action="delete" title="Deletar">del</button>
+          </span>
+        `;
         div.onclick = () => {
-          $all('.file-item').forEach(el => el.classList.remove('active'));
+          $all('.tree-row').forEach(el => el.classList.remove('active'));
           div.classList.add('active');
-          openFile(f.path);
+          if (isFolder) {
+            if (isExpanded) state.expandedDirs.delete(node.path);
+            else state.expandedDirs.add(node.path);
+            renderFileTree();
+            return;
+          }
+          openFile(node.path);
         };
+        div.querySelectorAll('[data-action]').forEach(btn => {
+          btn.addEventListener('click', event => {
+            event.stopPropagation();
+            if (btn.dataset.action === 'rename') renameTreePath(node.path);
+            if (btn.dataset.action === 'delete') deleteTreePath(node.path, node.type);
+          });
+        });
         tree.appendChild(div);
+
+        if (isFolder && isExpanded) {
+          (node.children || []).forEach(child => renderNode(child, depth + 1));
+        }
+      }
+
+      (state.tree || []).forEach(node => renderNode(node, 0));
+    }
+
+    function detectLanguage(filePath) {
+      const ext = String(filePath || '').toLowerCase().split('.').pop();
+      return ({
+        ts: 'typescript',
+        tsx: 'typescript',
+        js: 'javascript',
+        jsx: 'javascript',
+        json: 'json',
+        html: 'html',
+        css: 'css',
+        md: 'markdown',
+        py: 'python'
+      })[ext] || 'plaintext';
+    }
+
+    function ensureMonaco() {
+      if (state.monacoReady) return state.monacoReady;
+      state.monacoReady = new Promise((resolve, reject) => {
+        if (!window.require) {
+          reject(new Error('Monaco loader nao carregou.'));
+          return;
+        }
+        require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.2/min/vs' } });
+        require(['vs/editor/editor.main'], () => {
+          state.editor = monaco.editor.create($('#monaco-editor'), {
+            value: '',
+            language: 'plaintext',
+            theme: 'vs-dark',
+            automaticLayout: true,
+            minimap: { enabled: false },
+            fontSize: 13,
+            wordWrap: 'on',
+            scrollBeyondLastLine: false
+          });
+          state.editor.onDidChangeModelContent(() => {
+            if (state.suppressEditorChange || !state.activePath) return;
+            const doc = state.openedFiles.get(state.activePath);
+            if (!doc) return;
+            doc.content = state.editor.getValue();
+            doc.dirty = doc.content !== doc.savedContent;
+            updateSaveStatus(doc.dirty ? 'modificado' : 'salvo');
+            renderOpenFileTabs();
+            renderFileTree();
+          });
+          resolve(state.editor);
+        });
       });
+      return state.monacoReady;
+    }
+
+    function updateSaveStatus(status) {
+      state.saveStatus = status;
+      const el = $('#editor-save-status');
+      if (!el) return;
+      el.textContent = status;
+      el.className = 'save-status';
+      if (status === 'modificado') el.classList.add('modified');
+      if (status === 'salvo') el.classList.add('saved');
+      if (status === 'erro') el.classList.add('error');
+    }
+
+    async function openDocument(filePath, content, options = {}) {
+      await ensureMonaco();
+      const existing = state.openedFiles.get(filePath);
+      if (existing) {
+        setActiveDocument(filePath);
+        return existing;
+      }
+      const doc = {
+        path: filePath,
+        content,
+        savedContent: content,
+        language: detectLanguage(filePath),
+        dirty: false,
+        stagedFile: options.stagedFile || null
+      };
+      state.openedFiles.set(filePath, doc);
+      setActiveDocument(filePath);
+      return doc;
+    }
+
+    function setActiveDocument(filePath) {
+      const doc = state.openedFiles.get(filePath);
+      if (!doc || !state.editor) return;
+      state.activePath = filePath;
+      state.activeFile = doc;
+      state.suppressEditorChange = true;
+      monaco.editor.setModelLanguage(state.editor.getModel(), doc.language);
+      state.editor.setValue(doc.content || '');
+      state.suppressEditorChange = false;
+      $('#code-filename').textContent = `${doc.path}${doc.dirty ? ' *' : ''}`;
+      updateSaveStatus(doc.dirty ? 'modificado' : 'salvo');
+      renderOpenFileTabs();
+      renderFileTree();
+      setTimeout(() => state.editor.layout(), 20);
+    }
+
+    function renderOpenFileTabs() {
+      const root = $('#openFileTabs');
+      if (!root) return;
+      if (!state.openedFiles.size) {
+        root.innerHTML = '<div class="file-tab active"><span class="file-tab-name">Nenhum arquivo aberto</span></div>';
+        return;
+      }
+      root.innerHTML = Array.from(state.openedFiles.values()).map(doc => `
+        <button class="file-tab ${doc.path === state.activePath ? 'active' : ''}" data-open-path="${escapeHtml(doc.path)}">
+          <span class="file-tab-name">${escapeHtml(basename(doc.path))}${doc.dirty ? ' *' : ''}</span>
+          <span class="file-tab-close" data-close-path="${escapeHtml(doc.path)}">x</span>
+        </button>
+      `).join('');
+      root.querySelectorAll('[data-open-path]').forEach(tab => {
+        tab.addEventListener('click', () => setActiveDocument(tab.dataset.openPath));
+      });
+      root.querySelectorAll('[data-close-path]').forEach(btn => {
+        btn.addEventListener('click', event => {
+          event.stopPropagation();
+          closeFileTab(btn.dataset.closePath);
+        });
+      });
+    }
+
+    function closeFileTab(filePath) {
+      const doc = state.openedFiles.get(filePath);
+      if (!doc) return;
+      if (doc.dirty && !confirm(`O arquivo ${filePath} foi modificado. Fechar sem salvar?`)) {
+        return;
+      }
+      state.openedFiles.delete(filePath);
+      if (state.activePath === filePath) {
+        const next = Array.from(state.openedFiles.keys())[0];
+        if (next) setActiveDocument(next);
+        else {
+          state.activePath = null;
+          state.activeFile = null;
+          if (state.editor) state.editor.setValue('');
+          $('#code-filename').textContent = 'Selecione um arquivo no Explorer';
+          updateSaveStatus('sem arquivo');
+          renderOpenFileTabs();
+          renderFileTree();
+        }
+      } else {
+        renderOpenFileTabs();
+        renderFileTree();
+      }
+    }
+
+    async function saveActiveFile() {
+      const doc = state.openedFiles.get(state.activePath);
+      if (!doc) return;
+      if (doc.stagedFile) {
+        setStatus('Arquivos staged devem ser aplicados pelo Patch Review.');
+        return;
+      }
+      try {
+        updateSaveStatus('salvando');
+        const content = state.editor ? state.editor.getValue() : doc.content;
+        const res = await api('/api/project/file', {
+          method: 'PUT',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({
+            projectRoot: state.project?.projectPath || '.',
+            path: doc.path,
+            content
+          })
+        });
+        doc.content = content;
+        doc.savedContent = res.data?.content ?? content;
+        doc.dirty = false;
+        updateSaveStatus('salvo');
+        setStatus('Arquivo salvo: ' + doc.path);
+        renderOpenFileTabs();
+        renderFileTree();
+      } catch (error) {
+        updateSaveStatus('erro');
+        setStatus('Erro ao salvar: ' + error.message);
+      }
     }
 
     async function openFile(filePath, stagedFile = null) {
       if(!state.project && !stagedFile) return;
       openTab('code');
-      $('#code-filename').innerHTML = 'Carregando ' + filePath + '...';
-      $('#code-content').textContent = '';
-      
+      $('#code-filename').textContent = 'Carregando ' + filePath + '...';
       try {
         if (stagedFile) {
           const res = await api('/api/staged-files/' + stagedFile.id);
           const sf = res.data;
-          
-          let versionSelect = '';
-          if (sf.versions && sf.versions.length > 1) {
-            const opts = sf.versions.map((v, i) => `<option value="${v.version_id}">v${i+1} - ${new Date(v.created_at).toLocaleTimeString()}</option>`).reverse().join('');
-            versionSelect = `
-              <select id="staged-version-select" onchange="changeStagedVersion('${sf.id}')" style="margin-right:8px; padding:4px; font-size:11px; background:#111418; color:#fff; border:1px solid #3a4652; border-radius:4px;">${opts}</select>
-              <button class="btn-ghost" style="margin-right:8px; font-size:12px; padding:4px 8px; border:1px solid #3a4652;" title="Comparar Versão" onclick="compareStagedVersion('${sf.id}')">⚖️ Comparar</button>
-            `;
-          }
-          
-          $('#code-filename').innerHTML = `
-            <div style="display:flex; justify-content:space-between; align-items:center; width: 100%;">
-              <span>${filePath} <span class="badge ok">Staged</span></span>
-              <div style="display:flex; align-items:center; gap:6px;">
-                ${versionSelect}
-                <button class="btn-ghost" title="Copiar código" onclick="copyStagedCode()">📋</button>
-                <button class="btn-ghost" title="Baixar arquivo" onclick="downloadStagedCode('${filePath}')">⬇️</button>
-                <button class="btn-primary" onclick="applyStaged('${sf.id}', false)">Aplicar Código</button>
-                <button class="btn-primary" style="background:var(--yellow);color:#000" onclick="applyStaged('${sf.id}', true)">Aplicar e Testar</button>
-                <button class="btn-ghost" style="color:var(--red)" onclick="rejectStaged('${sf.id}')">Descartar</button>
-              </div>
-            </div>`;
-          $('#code-content').textContent = sf.content;
-          
+          await openDocument(filePath, sf.content, { stagedFile: sf });
           if (filePath.endsWith('.html')) {
             $('#preview-url').value = 'Preview Gerado';
             $('#preview-placeholder').style.display = 'none';
@@ -437,13 +686,12 @@ pre.code-view { margin: 0; font-size: 13px; line-height: 1.5; color: #dbe7ef; fo
             frame.style.display = 'block';
             frame.src = `/preview/staged/${sf.run_id}/index.html`;
           }
-        } else {
-          const res = await api('/api/project/file?projectRoot=' + encodeURIComponent(state.project.projectPath) + '&filePath=' + encodeURIComponent(filePath));
-          $('#code-filename').textContent = filePath;
-          $('#code-content').textContent = res.content;
+          return;
         }
+        const res = await api('/api/project/file?projectRoot=' + encodeURIComponent(state.project.projectPath) + '&filePath=' + encodeURIComponent(filePath));
+        await openDocument(filePath, res.content || res.data?.content || '');
       } catch(e) {
-        $('#code-content').textContent = 'Falha ao carregar conteúdo: ' + e.message;
+        setStatus('Falha ao carregar conteudo: ' + e.message);
       }
     }
 
@@ -452,18 +700,18 @@ pre.code-view { margin: 0; font-size: 13px; line-height: 1.5; color: #dbe7ef; fo
       const res = await api('/api/staged-files/' + id);
       const version = res.data.versions.find(v => v.version_id === vid);
       if (version) {
-        $('#code-content').textContent = version.content;
+        if (state.editor) state.editor.setValue(version.content);
       }
     };
 
     window.copyStagedCode = function() {
-      const code = $('#code-content').textContent;
+      const code = state.editor ? state.editor.getValue() : '';
       navigator.clipboard.writeText(code);
       setStatus("Código copiado!");
     };
 
     window.downloadStagedCode = function(filename) {
-      const code = $('#code-content').textContent;
+      const code = state.editor ? state.editor.getValue() : '';
       const blob = new Blob([code], { type: 'text/plain' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -558,10 +806,152 @@ pre.code-view { margin: 0; font-size: 13px; line-height: 1.5; color: #dbe7ef; fo
       try {
         await api('/api/staged-files/' + id + '/reject', { method: 'POST' });
         setStatus("Staged file removido");
-        $('#code-content').textContent = '';
         $('#code-filename').textContent = 'Selecione um arquivo';
+        if (state.activePath) closeFileTab(state.activePath);
         if (state.project) loadFiles(state.project.projectPath);
       } catch(e) { alert("Erro ao descartar: " + e.message); }
+    };
+
+    async function createProjectFile() {
+      const filePath = prompt('Novo arquivo (ex: src/example.ts):');
+      if (!filePath) return;
+      try {
+        await api('/api/project/file', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ projectRoot: state.project?.projectPath || '.', path: filePath, content: '' })
+        });
+        state.expandedDirs.add(dirname(filePath));
+        await loadFiles(state.project.projectPath);
+        await openFile(filePath);
+        setStatus('Arquivo criado: ' + filePath);
+      } catch (error) {
+        alert('Erro ao criar arquivo: ' + error.message);
+      }
+    }
+
+    async function createProjectFolderFromPrompt() {
+      const folderPath = prompt('Nova pasta (ex: src/components):');
+      if (!folderPath) return;
+      try {
+        await api('/api/project/folder', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ projectRoot: state.project?.projectPath || '.', path: folderPath })
+        });
+        state.expandedDirs.add(dirname(folderPath));
+        await loadFiles(state.project.projectPath);
+        setStatus('Pasta criada: ' + folderPath);
+      } catch (error) {
+        alert('Erro ao criar pasta: ' + error.message);
+      }
+    }
+
+    async function renameTreePath(oldPath) {
+      const newPath = prompt('Novo caminho:', oldPath);
+      if (!newPath || newPath === oldPath) return;
+      try {
+        await api('/api/project/rename', {
+          method: 'PUT',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ projectRoot: state.project?.projectPath || '.', oldPath, newPath })
+        });
+        const doc = state.openedFiles.get(oldPath);
+        if (doc) {
+          state.openedFiles.delete(oldPath);
+          doc.path = newPath;
+          state.openedFiles.set(newPath, doc);
+          if (state.activePath === oldPath) state.activePath = newPath;
+        }
+        await loadFiles(state.project.projectPath);
+        renderOpenFileTabs();
+        setStatus('Renomeado: ' + newPath);
+      } catch (error) {
+        alert('Erro ao renomear: ' + error.message);
+      }
+    }
+
+    async function deleteTreePath(targetPath, type) {
+      const label = type === 'directory' ? 'pasta' : 'arquivo';
+      if (!confirm(`Deletar ${label} ${targetPath}? Esta acao nao pode ser desfeita pelo Nexus.`)) return;
+      try {
+        const endpoint = type === 'directory' ? '/api/project/folder' : '/api/project/file';
+        await api(`${endpoint}?projectRoot=${encodeURIComponent(state.project?.projectPath || '.')}&path=${encodeURIComponent(targetPath)}`, {
+          method: 'DELETE'
+        });
+        if (type !== 'directory' && state.openedFiles.has(targetPath)) {
+          state.openedFiles.delete(targetPath);
+          if (state.activePath === targetPath) {
+            state.activePath = null;
+            if (state.editor) state.editor.setValue('');
+          }
+        }
+        await loadFiles(state.project.projectPath);
+        renderOpenFileTabs();
+        setStatus(`${label} deletado: ${targetPath}`);
+      } catch (error) {
+        alert('Erro ao deletar: ' + error.message);
+      }
+    }
+
+    $('#btn-refresh-tree').addEventListener('click', () => state.project && loadFiles(state.project.projectPath));
+    $('#btn-new-file').addEventListener('click', createProjectFile);
+    $('#btn-new-folder').addEventListener('click', createProjectFolderFromPrompt);
+    $('#btn-save-file').addEventListener('click', saveActiveFile);
+    document.addEventListener('keydown', event => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
+        event.preventDefault();
+        saveActiveFile();
+      }
+    });
+
+    function summarizeProjectTree(nodes, depth = 0, lines = []) {
+      if (lines.length >= 80) return lines;
+      (nodes || []).forEach(node => {
+        if (lines.length >= 80) return;
+        lines.push(`${'  '.repeat(depth)}- ${node.path}`);
+        if (node.type === 'directory') summarizeProjectTree(node.children || [], depth + 1, lines);
+      });
+      return lines;
+    }
+
+    function buildIDEContext() {
+      const activeDoc = state.activePath ? state.openedFiles.get(state.activePath) : null;
+      const activeContent = activeDoc
+        ? (state.editor && state.activePath === activeDoc.path ? state.editor.getValue() : activeDoc.content)
+        : '';
+      return [
+        `Arquivo ativo: ${activeDoc?.path || 'nenhum'}`,
+        `Arquivo modificado: ${activeDoc?.dirty ? 'sim' : 'nao'}`,
+        `Arquivos abertos: ${Array.from(state.openedFiles.keys()).join(', ') || 'nenhum'}`,
+        '',
+        'Conteudo atual do arquivo ativo:',
+        activeContent.slice(0, 6000),
+        activeContent.length > 6000 ? '\n...[conteudo truncado pela IDE]' : '',
+        '',
+        'Arvore resumida do projeto:',
+        summarizeProjectTree(state.tree).join('\n')
+      ].join('\n');
+    }
+
+    window.NexusIDE = {
+      openFile,
+      saveActiveFile,
+      buildIDEContext,
+      setActiveContent(content) {
+        if (state.editor) state.editor.setValue(String(content || ''));
+      },
+      getActiveFile() {
+        const doc = state.activePath ? state.openedFiles.get(state.activePath) : null;
+        return doc ? {
+          path: doc.path,
+          dirty: doc.dirty,
+          content: state.editor ? state.editor.getValue() : doc.content
+        } : null;
+      },
+      getOpenFiles() {
+        return Array.from(state.openedFiles.values()).map(doc => ({ path: doc.path, dirty: doc.dirty }));
+      }
     };
 
     // DevMind Init
@@ -569,6 +959,7 @@ pre.code-view { margin: 0; font-size: 13px; line-height: 1.5; color: #dbe7ef; fo
       window.DevMind.init({
         apiBase: '',
         containerId: 'devmindChat',
+        getContext: buildIDEContext,
         onSuccess: (data) => {
           if (state.project) loadFiles(state.project.projectPath);
           

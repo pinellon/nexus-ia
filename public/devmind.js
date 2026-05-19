@@ -32,7 +32,8 @@
     apiBase: "",
     onAction: null,
     onSuccess: null,
-    onError: null
+    onError: null,
+    getContext: null
   };
 
   // ── Utilidades ─────────────────────────────────────────────────────────────
@@ -299,7 +300,8 @@
         ],
         streaming: false,
         allow_premium: decision.estimated_cost_level === "high",
-        force_local:   decision.estimated_cost_level === "low"
+        force_local:   decision.estimated_cost_level === "low",
+        project_context: typeof state.getContext === "function" ? state.getContext() : ""
       })
     });
 
@@ -476,6 +478,7 @@
       state.onAction   = options.onAction   || null;
       state.onSuccess  = options.onSuccess  || null;
       state.onError    = options.onError    || null;
+      state.getContext = options.getContext || null;
       injectStyles();
       renderShell(options.containerId || "chat");
       return DevMind;

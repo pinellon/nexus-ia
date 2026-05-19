@@ -138,11 +138,12 @@ export function registerAgentRoutes(app: Express) {
   });
 
   app.post("/api/code-chat", async (req, res) => {
-    const { messages, streaming, allow_premium, force_local } = req.body as {
+    const { messages, streaming, allow_premium, force_local, project_context } = req.body as {
       messages?: unknown;
       streaming?: boolean;
       allow_premium?: boolean;
       force_local?: boolean;
+      project_context?: unknown;
     };
     const normalizedMessages = normalizeMessages(messages);
     const goal = readLatestUserMessage(normalizedMessages);
@@ -156,10 +157,14 @@ export function registerAgentRoutes(app: Express) {
         messages: normalizedMessages,
         projectRoot: "."
       });
+      const uiContext = typeof project_context === "string" ? project_context.slice(0, 10_000) : "";
+      const routedContext = uiContext
+        ? `${context.content}\n\nContexto atual da IDE:\n${uiContext}`
+        : context.content;
       const aiRouter = new AIProviderRouter();
       const aiDecision = await aiRouter.routeChatRequest({
         messages: normalizedMessages,
-        context: context.content,
+        context: routedContext,
         goal,
         allowPremium: Boolean(allow_premium),
         forceLocal: Boolean(force_local)
@@ -197,7 +202,8 @@ export function registerAgentRoutes(app: Express) {
       }
 
       const agentId = suggestAgentId(goal);
-      const run = await agentRunner.run_agent(agentId, goal, ".");
+      const agentGoal = uiContext ? `${goal}\n\nContexto atual da IDE:\n${uiContext}` : goal;
+      const run = await agentRunner.run_agent(agentId, agentGoal, ".");
       const settledRun = await waitForSettledRun(run.id);
       const artifacts = agentRunner.getArtifacts(run.id);
       const patchIds = collectPatchIds(run.id);
