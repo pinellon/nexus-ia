@@ -44,6 +44,7 @@ import {
   githubSearch,
   webSearch
 } from "./research-tools.js";
+import { buildPatchPayload, isPatchAction } from "./patch-payload.js";
 import { aiRateLimiter, commandRateLimiter, generalWriteRateLimiter } from "./rate-limit.js";
 import {
   appendMessage,
@@ -183,61 +184,6 @@ function parsePromptBody(req: express.Request) {
     context?: string;
     language?: string;
     agents?: AgentName[];
-  };
-}
-
-function isPatchAction(action: ActionRecord) {
-  return action.type === "create_file" || action.type === "write_file" || action.type === "patch_file" || action.type === "delete_file";
-}
-
-function buildUnifiedDiff(action: ActionRecord) {
-  switch (action.type) {
-    case "patch_file":
-      return [
-        `--- a/${action.path}`,
-        `+++ b/${action.path}`,
-        "@@ before",
-        ...action.before.split(/\r?\n/).map((line) => `-${line}`),
-        "@@ after",
-        ...action.after.split(/\r?\n/).map((line) => `+${line}`)
-      ].join("\n");
-    case "create_file":
-    case "write_file":
-      return [
-        `--- a/${action.path}`,
-        `+++ b/${action.path}`,
-        "@@ content",
-        ...action.content.split(/\r?\n/).map((line) => `+${line}`)
-      ].join("\n");
-    case "delete_file":
-      return [
-        `--- a/${action.path}`,
-        "+++ /dev/null",
-        "@@ delete",
-        `- delete ${action.path}`
-      ].join("\n");
-    default:
-      return "";
-  }
-}
-
-function buildPatchPayload(action: ActionRecord) {
-  const filesChanged = "path" in action ? [action.path] : [];
-  return {
-    id: action.id,
-    run_id: action.sessionId,
-    agent_id: action.sourceAgent || "unknown",
-    goal: action.goal || "",
-    files_changed: filesChanged,
-    risk: action.riskLevel,
-    status: action.status,
-    summary: action.reason,
-    created_at: action.createdAt,
-    updated_at: action.updatedAt,
-    diff: buildUnifiedDiff(action),
-    before: action.type === "patch_file" ? action.before : "",
-    after: action.type === "patch_file" ? action.after : "content" in action ? action.content : "",
-    action
   };
 }
 
@@ -750,7 +696,8 @@ app.post("/api/actions/:id/apply", async (req, res) => {
 
 app.get("/api/patches", async (_req, res) => {
   try {
-    const actions = (await listPendingActions()).filter(isPatchAction).map(buildPatchPayload);
+    const pending = (await listPendingActions()).filter(isPatchAction);
+    const actions = await Promise.all(pending.map((action) => buildPatchPayload(action)));
     return res.json({
       ok: true,
       data: actions
@@ -765,7 +712,10 @@ app.get("/api/patches", async (_req, res) => {
 
 app.get("/api/patches/pending", async (_req, res) => {
   try {
-    const patches = (await listPendingActions()).filter(isPatchAction);
+    const pending = (await listPendingActions()).filter(
+      (action) => isPatchAction(action) && (action.status === "pending" || action.status === "approved")
+    );
+    const patches = await Promise.all(pending.map((action) => buildPatchPayload(action)));
     return res.json({
       ok: true,
       patches
@@ -818,9 +768,11 @@ app.post("/api/patches/pending/:patchId/apply", async (req, res) => {
 
     const applied = await applyAction(action.id);
     await writeActionHistory(applied.action.sessionId, "Patch aplicado pelo usuario", applied.action);
+    const patch = await buildPatchPayload(applied.action);
     return res.json({
       ok: true,
-      patch: applied.action,
+      patch,
+      data: patch,
       result: applied.result
     });
   } catch (error) {
@@ -858,9 +810,11 @@ app.get("/api/patches/:patchId", async (req, res) => {
       return res.status(404).json({ ok: false, error: "patch nao encontrado" });
     }
 
+    const patch = await buildPatchPayload(action);
     return res.json({
       ok: true,
-      data: buildPatchPayload(action)
+      patch,
+      data: patch
     });
   } catch (error) {
     return res.status(500).json({
@@ -883,10 +837,12 @@ app.post("/api/patches/:patchId/apply", async (req, res) => {
 
     const applied = await applyAction(action.id);
     await writeActionHistory(applied.action.sessionId, "Patch aplicado pelo usuario", applied.action);
+    const patch = await buildPatchPayload(applied.action);
     return res.json({
       ok: true,
+      patch,
       data: {
-        patch: buildPatchPayload(applied.action),
+        patch,
         result: applied.result
       }
     });
@@ -906,9 +862,11 @@ app.post("/api/patches/:patchId/reject", async (req, res) => {
     }
 
     await writeActionHistory(action.sessionId, "Patch rejeitado pelo usuario", action);
+    const patch = await buildPatchPayload(action);
     return res.json({
       ok: true,
-      data: buildPatchPayload(action)
+      patch,
+      data: patch
     });
   } catch (error) {
     return res.status(400).json({
@@ -1297,6 +1255,10 @@ app.use((_req, res) => {
   res.sendFile(path.join(publicDir, "index.html"));
 });
 
-app.listen(port, () => {
-  console.log(`Nexus IDE rodando em http://localhost:${port}`);
-});
+export { app };
+
+if (process.env.NODE_ENV !== "test" && !process.env.VITEST) {
+  app.listen(port, () => {
+    console.log(`Nexus IDE rodando em http://localhost:${port}`);
+  });
+}

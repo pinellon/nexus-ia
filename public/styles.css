@@ -423,8 +423,12 @@ code, pre { font-family: var(--font-mono); }
 .patch-review-actions { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 12px; border-top: 1px solid var(--vscode-border-subtle); flex-shrink: 0; }
 .patch-sidebar-card { cursor: pointer; padding: 8px; margin-bottom: 4px; border: 1px solid var(--vscode-border-subtle); border-radius: 4px; background: var(--vscode-bg); }
 .patch-sidebar-card.active { border-color: var(--vscode-accent); background: rgba(0, 122, 204, 0.12); }
+.patch-sidebar-card-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 4px; }
+.patch-sidebar-id { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; color: var(--vscode-muted); font-family: var(--mono); }
 .patch-sidebar-type { font-size: 10px; font-weight: 700; text-transform: uppercase; margin-bottom: 2px; }
 .patch-sidebar-path { font-size: 11px; color: var(--vscode-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.patch-sidebar-meta { display: grid; gap: 2px; margin: 6px 0; color: var(--vscode-muted); font-size: 10px; }
+.patch-sidebar-summary { margin: 6px 0; color: var(--vscode-soft); font-size: 11px; line-height: 1.35; }
 .patch-stale-alert { margin: 6px 12px 0; padding: 8px; border-radius: 4px; border: 1px solid rgba(244, 135, 113, 0.4); background: rgba(244, 135, 113, 0.08); font-size: 11px; }
 .risk-low { color: var(--vscode-green); }
 .risk-medium { color: var(--vscode-yellow); }
