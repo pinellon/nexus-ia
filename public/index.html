@@ -4,18 +4,19 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Nexus Codex</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@vscode/codicons@0.0.36/dist/codicon.css">
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
   <div class="ide-shell" id="ide-shell">
     <!-- Activity Bar -->
     <nav class="activity-bar" aria-label="Activity Bar">
-      <button type="button" class="activity-btn active" data-target="explorer" title="Explorer">&#128193;</button>
-      <button type="button" class="activity-btn" data-target="search" title="Buscar">&#128269;</button>
-      <button type="button" class="activity-btn" data-target="git" title="Git">&#105;</button>
-      <button type="button" class="activity-btn" data-target="sessions" title="Sessões">&#128172;</button>
-      <button type="button" class="activity-btn" data-target="patches" title="Patches" id="act-patches" data-count="0">&#128203;</button>
-      <button type="button" class="activity-btn" data-target="settings" title="Configurações" style="margin-top:auto">&#9881;</button>
+      <button type="button" class="activity-btn active" data-target="explorer" title="Explorer (Ctrl+Shift+E)"><i class="codicon codicon-files"></i></button>
+      <button type="button" class="activity-btn" data-target="search" title="Buscar (Ctrl+Shift+F)"><i class="codicon codicon-search"></i></button>
+      <button type="button" class="activity-btn" data-target="git" title="Git"><i class="codicon codicon-source-control"></i></button>
+      <button type="button" class="activity-btn" data-target="sessions" title="Sessões"><i class="codicon codicon-comment-discussion"></i></button>
+      <button type="button" class="activity-btn" data-target="patches" title="Patches" id="act-patches" data-count="0"><i class="codicon codicon-diff"></i></button>
+      <button type="button" class="activity-btn activity-btn-bottom" data-target="settings" title="Configurações"><i class="codicon codicon-gear"></i></button>
     </nav>
 
     <!-- Sidebar -->
@@ -23,11 +24,12 @@
       <div class="side-view active" id="side-explorer">
         <div class="sidebar-header">
           <span>Explorer</span>
+          <button type="button" class="icon-btn icon-btn-ghost" id="btn-collapse-sidebar" title="Recolher (Ctrl+B)"><i class="codicon codicon-chevron-left"></i></button>
         </div>
         <div class="explorer-toolbar">
-          <button type="button" class="icon-btn" id="btn-refresh-tree" title="Atualizar">↻</button>
-          <button type="button" class="icon-btn" id="btn-new-file" title="Novo arquivo">+ Arq</button>
-          <button type="button" class="icon-btn" id="btn-new-folder" title="Nova pasta">+ Pasta</button>
+          <button type="button" class="icon-btn" id="btn-refresh-tree" title="Atualizar"><i class="codicon codicon-refresh"></i></button>
+          <button type="button" class="icon-btn" id="btn-new-file" title="Novo arquivo"><i class="codicon codicon-new-file"></i></button>
+          <button type="button" class="icon-btn" id="btn-new-folder" title="Nova pasta"><i class="codicon codicon-new-folder"></i></button>
         </div>
         <div class="sidebar-content file-tree" id="fileTree">
           <div class="empty-state">Carregando...</div>
@@ -35,13 +37,19 @@
       </div>
 
       <div class="side-view" id="side-search">
-        <div class="sidebar-header">Buscar</div>
-        <div class="sidebar-content placeholder-view">Busca no projeto em breve.</div>
+        <div class="sidebar-header">Buscar no projeto</div>
+        <div class="search-box-wrap">
+          <i class="codicon codicon-search search-box-icon"></i>
+          <input type="search" id="search-input" class="search-input" placeholder="Nome do arquivo..." autocomplete="off">
+        </div>
+        <div class="sidebar-content" id="search-results"></div>
       </div>
 
       <div class="side-view" id="side-git">
-        <div class="sidebar-header">Git</div>
-        <div class="sidebar-content placeholder-view">Status Git básico em breve.</div>
+        <div class="sidebar-header">Controle de versão</div>
+        <div class="sidebar-content" id="git-status-panel">
+          <div class="empty-state">Carregando status Git...</div>
+        </div>
       </div>
 
       <div class="side-view" id="side-sessions">
@@ -99,6 +107,18 @@
         </div>
         <div class="file-tabs" id="openFileTabs" role="tablist"></div>
         <div class="monaco-shell">
+          <div id="editor-welcome" class="editor-welcome">
+            <div class="editor-welcome-inner">
+              <h1 class="editor-welcome-title">Nexus Codex</h1>
+              <p class="editor-welcome-sub">Abra um arquivo no Explorer ou use a busca rapida.</p>
+              <ul class="editor-welcome-shortcuts">
+                <li><kbd>Ctrl</kbd>+<kbd>P</kbd> buscar arquivo</li>
+                <li><kbd>Ctrl</kbd>+<kbd>S</kbd> salvar</li>
+                <li><kbd>Ctrl</kbd>+<kbd>B</kbd> alternar sidebar</li>
+                <li><kbd>Ctrl</kbd>+<kbd>`</kbd> terminal</li>
+              </ul>
+            </div>
+          </div>
           <div id="monaco-editor"></div>
         </div>
       </section>
@@ -110,10 +130,11 @@
     <aside class="ai-panel" id="ai-panel">
       <header class="ai-panel-header">
         <span class="ai-panel-title">Nexus AI</span>
-        <button type="button" class="icon-btn" id="btn-toggle-ai" title="Recolher painel">›</button>
+        <button type="button" class="icon-btn" id="btn-toggle-ai" title="Recolher painel"><i class="codicon codicon-chevron-right"></i></button>
       </header>
       <div class="ai-panel-tools">
-        <button type="button" class="btn-secondary" id="btn-use-file-context">Contexto do arquivo</button>
+        <button type="button" class="btn-secondary btn-sm" id="btn-use-file-context"><i class="codicon codicon-file-code"></i> Arquivo</button>
+        <button type="button" class="btn-secondary btn-sm" id="btn-use-selection-context"><i class="codicon codicon-selection"></i> Seleção</button>
       </div>
       <div class="ai-panel-body">
         <div id="devmindChat"></div>
@@ -121,7 +142,7 @@
     </aside>
 
     <aside class="ai-panel-collapsed" id="ai-panel-collapsed">
-      <button type="button" class="activity-btn" id="btn-expand-ai" title="Abrir Nexus AI">🤖</button>
+      <button type="button" class="activity-btn" id="btn-expand-ai" title="Abrir Nexus AI"><i class="codicon codicon-hubot"></i></button>
     </aside>
 
     <div class="resize-h" data-resize="bottom" title="Redimensionar painel inferior"></div>
@@ -132,11 +153,16 @@
         <button type="button" class="panel-tab active" data-panel="terminal">Terminal</button>
         <button type="button" class="panel-tab" data-panel="output">Output</button>
         <button type="button" class="panel-tab" data-panel="problems">Problems</button>
-        <button type="button" class="panel-tab" data-panel="patch">Patch Review</button>
+        <button type="button" class="panel-tab" data-panel="patch" id="panel-tab-patch">Patch Review<span class="panel-tab-badge" id="patch-tab-badge"></span></button>
         <span class="panel-tab-spacer"></span>
         <button type="button" class="icon-btn" id="btn-toggle-bottom" title="Fechar painel">✕</button>
       </div>
       <div class="panel-body">
+        <div class="panel-toolbar">
+          <button type="button" class="icon-btn" id="btn-clear-terminal" title="Limpar"><i class="codicon codicon-clear-all"></i></button>
+          <button type="button" class="icon-btn" id="btn-run-typecheck"><i class="codicon codicon-check"></i> typecheck</button>
+          <button type="button" class="icon-btn" id="btn-run-build"><i class="codicon codicon-package"></i> build</button>
+        </div>
         <div class="panel-view active" id="panel-terminal">
           <div class="terminal-body" id="terminal-output">Aguardando comandos...</div>
         </div>
@@ -193,6 +219,8 @@
   <script src="/terminal.js"></script>
   <script src="/patch-review.js"></script>
   <script src="/ai-panel.js"></script>
+  <script src="/search.js"></script>
+  <script src="/sidebar-panels.js"></script>
   <script src="/app.js"></script>
 </body>
 </html>

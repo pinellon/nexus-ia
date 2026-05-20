@@ -1,4 +1,26 @@
 /* File tree explorer */
+function fileCodicon(node, isExpanded) {
+  if (node.type === "directory") {
+    return isExpanded ? "codicon-folder-opened" : "codicon-folder";
+  }
+  const ext = String(node.name || node.path || "")
+    .split(".")
+    .pop()
+    ?.toLowerCase();
+  const map = {
+    ts: "codicon-file-code",
+    tsx: "codicon-file-code",
+    js: "codicon-file-code",
+    jsx: "codicon-file-code",
+    json: "codicon-json",
+    html: "codicon-file-code",
+    css: "codicon-file-code",
+    md: "codicon-markdown",
+    py: "codicon-file-code"
+  };
+  return map[ext] || "codicon-file";
+}
+
 function isPathInsideFolder(filePath, folderPath) {
   return filePath === folderPath || filePath.startsWith(folderPath + "/");
 }
@@ -15,7 +37,7 @@ function renderFileTree() {
   (state.stagedFiles || []).forEach((f) => {
     const div = document.createElement("div");
     div.className = "tree-row";
-    div.innerHTML = `<span class="tree-icon">◇</span><span class="tree-label">${escapeHtml(f.path)}</span><span class="badge ok">Staged</span>`;
+    div.innerHTML = `<span class="tree-icon"><i class="codicon codicon-diff"></i></span><span class="tree-label">${escapeHtml(f.path)}</span><span class="badge ok">Staged</span>`;
     div.onclick = () => {
       $all(".tree-row").forEach((el) => el.classList.remove("active"));
       div.classList.add("active");
@@ -35,8 +57,8 @@ function renderFileTree() {
       <span class="tree-icon">${isFolder ? (isExpanded ? "▾" : "▸") : fileIcon(node)}</span>
       <span class="tree-label">${escapeHtml(node.name || node.path)}${dirtyMark}</span>
       <span class="tree-actions">
-        <button type="button" class="tree-action" data-action="rename" title="Renomear">✎</button>
-        <button type="button" class="tree-action" data-action="delete" title="Deletar">×</button>
+        <button type="button" class="tree-action" data-action="rename" title="Renomear"><i class="codicon codicon-edit"></i></button>
+        <button type="button" class="tree-action" data-action="delete" title="Deletar"><i class="codicon codicon-trash"></i></button>
       </span>`;
     div.onclick = () => {
       $all(".tree-row").forEach((el) => el.classList.remove("active"));

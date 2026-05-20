@@ -1,4 +1,25 @@
 /* Resizable panels and collapse */
+const LAYOUT_STORAGE_KEY = "nexus-ide-layout-v1";
+
+function loadLayoutFromStorage() {
+  try {
+    const raw = localStorage.getItem(LAYOUT_STORAGE_KEY);
+    if (!raw) return;
+    const saved = JSON.parse(raw);
+    Object.assign(state.layout, saved);
+  } catch {
+    /* ignore */
+  }
+}
+
+function saveLayoutToStorage() {
+  try {
+    localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify(state.layout));
+  } catch {
+    /* ignore */
+  }
+}
+
 function applyLayoutCss() {
   const root = document.documentElement;
   const L = state.layout;
@@ -10,7 +31,17 @@ function applyLayoutCss() {
   if (!shell) return;
   shell.classList.toggle("ai-collapsed", L.aiCollapsed);
   shell.classList.toggle("bottom-collapsed", L.bottomCollapsed);
+  shell.classList.toggle("sidebar-collapsed", !!L.sidebarCollapsed);
 }
+
+function toggleSidebar() {
+  state.layout.sidebarCollapsed = !state.layout.sidebarCollapsed;
+  applyLayoutCss();
+  saveLayoutToStorage();
+  setTimeout(() => state.editor?.layout(), 50);
+}
+
+window.toggleSidebar = toggleSidebar;
 
 function initResize(handle, axis, onResize) {
   let start = 0;
@@ -32,6 +63,7 @@ function initResize(handle, axis, onResize) {
       handle.classList.remove("dragging");
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
+      saveLayoutToStorage();
     };
 
     window.addEventListener("mousemove", onMove);
@@ -40,7 +72,10 @@ function initResize(handle, axis, onResize) {
 }
 
 function initLayout() {
+  loadLayoutFromStorage();
   applyLayoutCss();
+
+  $("#btn-collapse-sidebar")?.addEventListener("click", toggleSidebar);
 
   const sidebarHandle = $('.resize-v[data-resize="sidebar"]');
   if (sidebarHandle) {
@@ -73,6 +108,7 @@ function initLayout() {
   $("#btn-toggle-ai")?.addEventListener("click", () => {
     state.layout.aiCollapsed = !state.layout.aiCollapsed;
     applyLayoutCss();
+    saveLayoutToStorage();
     setTimeout(() => state.editor?.layout(), 50);
     setTimeout(() => state.diffEditor?.layout(), 50);
   });
@@ -80,25 +116,69 @@ function initLayout() {
   $("#btn-expand-ai")?.addEventListener("click", () => {
     state.layout.aiCollapsed = false;
     applyLayoutCss();
+    saveLayoutToStorage();
     setTimeout(() => state.editor?.layout(), 50);
   });
 
   $("#btn-toggle-bottom")?.addEventListener("click", () => {
     state.layout.bottomCollapsed = !state.layout.bottomCollapsed;
     applyLayoutCss();
+    saveLayoutToStorage();
     setTimeout(() => state.editor?.layout(), 50);
+  });
+}
+
+function initKeyboardShortcuts() {
+  document.addEventListener("keydown", (event) => {
+    const mod = event.ctrlKey || event.metaKey;
+    if (!mod) return;
+    const key = event.key.toLowerCase();
+
+    if (key === "b" && !event.shiftKey) {
+      event.preventDefault();
+      toggleSidebar();
+      return;
+    }
+    if (key === "`") {
+      event.preventDefault();
+      if (typeof window.toggleTerminal === "function") window.toggleTerminal();
+      return;
+    }
+    if (event.shiftKey && key === "e") {
+      event.preventDefault();
+      if (typeof activateSideView === "function") activateSideView("explorer");
+      return;
+    }
+    if (event.shiftKey && key === "f") {
+      event.preventDefault();
+      if (typeof activateSideView === "function") activateSideView("search");
+      $("#search-input")?.focus();
+      return;
+    }
+    if (key === "p") {
+      event.preventDefault();
+      if (typeof activateSideView === "function") activateSideView("search");
+      const input = $("#search-input");
+      if (input) {
+        input.focus();
+        input.select();
+      }
+    }
   });
 }
 
 function showBottomPanel(name) {
   state.layout.bottomCollapsed = false;
   applyLayoutCss();
+  saveLayoutToStorage();
   $all(".panel-tab").forEach((tab) => {
     tab.classList.toggle("active", tab.dataset.panel === name);
   });
   $all(".panel-view").forEach((view) => {
     view.classList.toggle("active", view.id === `panel-${name}`);
   });
+  const toolbar = $(".panel-toolbar");
+  if (toolbar) toolbar.classList.toggle("hidden", name !== "terminal");
   setTimeout(() => {
     state.editor?.layout();
     state.diffEditor?.layout();

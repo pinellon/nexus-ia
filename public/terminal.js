@@ -21,6 +21,7 @@ function clearTerminal() {
 function toggleBottomPanel() {
   state.layout.bottomCollapsed = !state.layout.bottomCollapsed;
   applyLayoutCss();
+  if (typeof saveLayoutToStorage === "function") saveLayoutToStorage();
   setTimeout(() => state.editor?.layout(), 50);
 }
 

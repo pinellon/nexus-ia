@@ -66,6 +66,13 @@ function ensureMonaco() {
   return state.monacoReady;
 }
 
+function updateEditorWelcome() {
+  const welcome = $("#editor-welcome");
+  if (!welcome) return;
+  const show = !state.activePath && state.openedFiles.size === 0;
+  welcome.classList.toggle("hidden", !show);
+}
+
 function updateSaveStatus(status) {
   state.saveStatus = status;
   const el = $("#editor-save-status");
@@ -110,6 +117,7 @@ function setActiveDocument(filePath) {
   updateSaveStatus(doc.dirty ? "modificado" : "salvo");
   renderOpenFileTabs();
   renderFileTree();
+  updateEditorWelcome();
   setTimeout(() => state.editor.layout(), 20);
 }
 
@@ -118,6 +126,7 @@ function renderOpenFileTabs() {
   if (!root) return;
   if (!state.openedFiles.size) {
     root.innerHTML = "";
+    updateEditorWelcome();
     return;
   }
   root.innerHTML = Array.from(state.openedFiles.values())
@@ -131,6 +140,12 @@ function renderOpenFileTabs() {
     .join("");
   root.querySelectorAll("[data-open-path]").forEach((tab) => {
     tab.addEventListener("click", () => setActiveDocument(tab.dataset.openPath));
+    tab.addEventListener("auxclick", (event) => {
+      if (event.button === 1) {
+        event.preventDefault();
+        closeFileTab(tab.dataset.openPath);
+      }
+    });
   });
   root.querySelectorAll("[data-close-path]").forEach((btn) => {
     btn.addEventListener("click", (event) => {
@@ -163,6 +178,7 @@ function clearEditorIfNoActiveFile() {
   updateSaveStatus("sem arquivo");
   renderOpenFileTabs();
   renderFileTree();
+  updateEditorWelcome();
 }
 
 async function saveActiveFile() {
@@ -220,6 +236,7 @@ async function openFile(filePath, stagedFile = null) {
 }
 
 function initEditor() {
+  updateEditorWelcome();
   $("#btn-save-file")?.addEventListener("click", saveActiveFile);
   document.addEventListener("keydown", (event) => {
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {

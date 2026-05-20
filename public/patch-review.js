@@ -11,6 +11,17 @@ function riskBadge(risk) {
   return `<span class="badge ${cls} ${riskClass(risk)}">${escapeHtml(risk || "low")}</span>`;
 }
 
+function updatePatchTabBadge() {
+  const n = state.patches?.length || 0;
+  const act = $("#act-patches");
+  const badge = $("#patch-tab-badge");
+  if (act) act.dataset.count = String(n);
+  if (badge) {
+    badge.textContent = n > 0 ? String(n) : "";
+    badge.style.display = n > 0 ? "inline-flex" : "none";
+  }
+}
+
 function showPatchReviewEmpty(message) {
   $("#patch-review-empty").style.display = "block";
   $("#patch-review-empty").textContent = message;
@@ -200,7 +211,7 @@ async function loadPatches() {
       }).catch(() => {});
     }
 
-    $("#act-patches").dataset.count = state.patches.length;
+    updatePatchTabBadge();
     renderPatchSidebar();
     if (!state.patches.length) {
       showPatchReviewEmpty("Nenhum patch pendente. Pe├ºa ao Nexus para criar ou modificar algo.");

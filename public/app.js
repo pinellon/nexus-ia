@@ -28,7 +28,8 @@ const state = {
     aiWidth: 360,
     bottomHeight: 220,
     aiCollapsed: false,
-    bottomCollapsed: false
+    bottomCollapsed: false,
+    sidebarCollapsed: false
   }
 };
 
@@ -170,6 +171,10 @@ async function loadFiles(projectPath) {
     state.files = flattenTree(state.tree);
     state.stagedFiles = stagedRes.data || [];
     renderFileTree();
+    if (typeof renderSearchResults === "function") {
+      const q = $("#search-input")?.value?.trim();
+      if (q) renderSearchResults(q);
+    }
   } catch {
     const tree = $("#fileTree");
     if (tree) tree.innerHTML = '<div class="empty-state">Falha ao ler arquivos</div>';
@@ -287,32 +292,50 @@ window.NexusIDE = {
   }
 };
 
+function activateSideView(target) {
+  if (!target) return;
+  if (target === "patches") {
+    showBottomPanel("patch");
+    if (typeof loadPatches === "function") loadPatches();
+    $all(".activity-btn[data-target]").forEach((b) =>
+      b.classList.toggle("active", b.dataset.target === "patches")
+    );
+    return;
+  }
+  if (state.layout.sidebarCollapsed) {
+    state.layout.sidebarCollapsed = false;
+    applyLayoutCss();
+    if (typeof saveLayoutToStorage === "function") saveLayoutToStorage();
+  }
+  $all(".activity-btn[data-target]").forEach((b) => {
+    if (b.dataset.target !== "settings") {
+      b.classList.toggle("active", b.dataset.target === target);
+    }
+  });
+  $all(".side-view").forEach((v) => v.classList.remove("active"));
+  const view = $(`#side-${target}`);
+  if (view) view.classList.add("active");
+  if (target === "settings") loadIA();
+  if (target === "git" && typeof loadGitStatus === "function") loadGitStatus();
+}
+
+window.activateSideView = activateSideView;
+
 function initActivityBar() {
-  $all(".activity-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const target = btn.dataset.target;
-      if (target === "patches") {
-        showBottomPanel("patch");
-        if (typeof loadPatches === "function") loadPatches();
-        return;
-      }
-      $all(".activity-btn").forEach((b) => b.classList.remove("active"));
-      btn.classList.add("active");
-      $all(".side-view").forEach((v) => v.classList.remove("active"));
-      const view = $(`#side-${target}`);
-      if (view) view.classList.add("active");
-      if (target === "ia") loadIA();
-    });
+  $all(".activity-btn[data-target]").forEach((btn) => {
+    btn.addEventListener("click", () => activateSideView(btn.dataset.target));
   });
 }
 
 function initApp() {
   initActivityBar();
   initLayout();
+  initKeyboardShortcuts();
   initEditor();
   initExplorer();
   initTerminal();
   initAiPanel();
+  if (typeof initSearch === "function") initSearch();
 
   $("#btn-save-ia")?.addEventListener("click", async () => {
     try {

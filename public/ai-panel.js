@@ -1,15 +1,27 @@
 /* Nexus AI side panel */
 function initAiPanel() {
-  $("#btn-use-file-context")?.addEventListener("click", () => {
-    const input = $("#devmindChat input");
-    const form = $("#devmindChat form button");
+  function getChatInput() {
+    return $("#dm-input") || $("#devmindChat textarea") || $("#devmindChat input");
+  }
+
+  function attachContextToChat(label) {
+    const input = getChatInput();
     if (!input) return;
     const ctx = buildIDEContext();
     const active = state.activePath || "nenhum";
-    input.value = `Usando contexto do arquivo ${active}. `;
+    input.value = `Usando ${label} de ${active}. `;
     input.dataset.pendingContext = ctx;
-    setStatus("Contexto do arquivo anexado à próxima mensagem");
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    setStatus("Contexto do arquivo anexado a proxima mensagem");
     input.focus();
+  }
+
+  $("#btn-use-file-context")?.addEventListener("click", () => {
+    attachContextToChat("contexto do arquivo");
+  });
+
+  $("#btn-use-selection-context")?.addEventListener("click", () => {
+    attachContextToChat("selecao atual");
   });
 
   if (window.DevMind) {
@@ -18,7 +30,7 @@ function initAiPanel() {
       apiBase: "",
       containerId: "devmindChat",
       getContext: () => {
-        const input = $("#devmindChat input");
+        const input = getChatInput();
         const extra = input?.dataset.pendingContext;
         if (extra) {
           delete input.dataset.pendingContext;
