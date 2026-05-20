@@ -1,0 +1,64 @@
+/* Nexus AI side panel */
+function initAiPanel() {
+  function getChatInput() {
+    return $("#dm-input") || $("#devmindChat textarea") || $("#devmindChat input");
+  }
+
+  function attachContextToChat(label) {
+    const input = getChatInput();
+    if (!input) return;
+    const ctx = buildIDEContext();
+    const active = state.activePath || "nenhum";
+    input.value = `Usando ${label} de ${active}. `;
+    input.dataset.pendingContext = ctx;
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    setStatus("Contexto do arquivo anexado a proxima mensagem");
+    input.focus();
+  }
+
+  $("#btn-use-file-context")?.addEventListener("click", () => {
+    attachContextToChat("contexto do arquivo");
+  });
+
+  $("#btn-use-selection-context")?.addEventListener("click", () => {
+    attachContextToChat("selecao atual");
+  });
+
+  if (window.DevMind) {
+    const originalGetContext = buildIDEContext;
+    window.DevMind.init({
+      apiBase: "",
+      containerId: "devmindChat",
+      getContext: () => {
+        const input = getChatInput();
+        const extra = input?.dataset.pendingContext;
+        if (extra) {
+          delete input.dataset.pendingContext;
+          return extra;
+        }
+        return originalGetContext();
+      },
+      onSuccess: (data) => {
+        if (state.project) loadFiles(state.project.projectPath);
+        if (data.patch_ids?.length && typeof loadPatches === "function") {
+          loadPatches();
+          showBottomPanel("patch");
+        }
+        setTimeout(() => {
+          if (state.stagedFiles?.length) {
+            $(".activity-btn[data-target='explorer']")?.click();
+            openFile(state.stagedFiles[0].path, state.stagedFiles[0]);
+          }
+        }, 500);
+      }
+    });
+  }
+
+  document.addEventListener("devmind:action", (event) => {
+    const detail = event.detail || {};
+    if (detail.value === "patches" || detail.id === "open_patches") {
+      showBottomPanel("patch");
+      if (typeof loadPatches === "function") loadPatches();
+    }
+  });
+}
