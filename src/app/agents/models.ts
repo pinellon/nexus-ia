@@ -12,6 +12,7 @@ export type AgentRunStatus =
 export type AgentEventType =
   | "started"
   | "planning"
+  | "running"
   | "reading_project"
   | "tool_call"
   | "tool_result"
@@ -22,7 +23,8 @@ export type AgentEventType =
   | "needs_approval"
   | "completed"
   | "failed"
-  | "cancelled";
+  | "cancelled"
+  | "interrupted";
 
 export type AgentArtifactType =
   | "plan"

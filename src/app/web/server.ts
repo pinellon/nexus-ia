@@ -1,14 +1,16 @@
-import type { Express } from "express";
+import type { Express, Response } from "express";
 
 import { ContextBuilder, type CodeChatMessage } from "../ai/context-builder.js";
 import { AIProviderRouter } from "../ai/provider-router.js";
 import { agentRegistry } from "../agents/registry.js";
 import { agentRunner } from "../agents/runner.js";
-import type { AgentRunStatus } from "../agents/models.js";
+import type { AgentEvent, AgentRunStatus } from "../agents/models.js";
+import { runEventBus } from "../runs/run-event-bus.js";
 import { addStagedFile, applyStagedFile, clearStagedFiles, getStagedFile, listStagedFiles, removeStagedFile } from "./staged-files.js";
 import { aiRateLimiter } from "../../rate-limit.js";
 
 const contextBuilder = new ContextBuilder();
+const finalEventTypes = new Set(["completed", "failed", "cancelled", "interrupted", "needs_approval"]);
 
 function suggestAgentId(goal: string) {
   const lowered = goal.toLowerCase();
@@ -120,6 +122,26 @@ function buildNextActions(patchIds: string[]) {
     { id: "open_project", label: "Abrir projeto", type: "view", value: "project" },
     { id: "open_artifacts", label: "Ver artefatos", type: "view", value: "agents" }
   ];
+}
+
+function writeSseEvent(res: Response, eventName: string, data: unknown) {
+  res.write(`event: ${eventName}\n`);
+  res.write(`data: ${JSON.stringify(data)}\n\n`);
+}
+
+function serializeAgentEvent(event: AgentEvent) {
+  return {
+    runId: event.runId,
+    type: event.type,
+    message: event.message,
+    level: event.level,
+    createdAt: event.createdAt,
+    payload: event.payload ?? {}
+  };
+}
+
+function isFinalAgentEvent(event: AgentEvent) {
+  return finalEventTypes.has(event.type);
 }
 
 export function registerAgentRoutes(app: Express) {
@@ -388,6 +410,63 @@ export function registerAgentRoutes(app: Express) {
       ok: true,
       data: agentRunner.getEvents(req.params.runId)
     });
+  });
+
+  app.get("/api/agents/runs/:runId/events/stream", (req, res) => {
+    const runId = req.params.runId;
+    const run = agentRunner.getRun(runId);
+    if (!run) {
+      return res.status(404).json({ ok: false, error: "run nao encontrada" });
+    }
+
+    res.writeHead(200, {
+      "Content-Type": "text/event-stream; charset=utf-8",
+      "Cache-Control": "no-cache, no-transform",
+      Connection: "keep-alive",
+      "X-Accel-Buffering": "no"
+    });
+    res.flushHeaders?.();
+
+    let closed = false;
+    let unsubscribe = () => {};
+    let heartbeat: ReturnType<typeof setInterval>;
+
+    const close = () => {
+      if (closed) return;
+      closed = true;
+      if (heartbeat) clearInterval(heartbeat);
+      unsubscribe();
+      res.end();
+    };
+
+    const listener = (event: AgentEvent) => {
+      if (closed) return;
+      writeSseEvent(res, "agent_event", serializeAgentEvent(event));
+      if (isFinalAgentEvent(event)) {
+        close();
+      }
+    };
+
+    unsubscribe = runEventBus.subscribe(runId, listener);
+    heartbeat = setInterval(() => {
+      if (!closed) {
+        writeSseEvent(res, "heartbeat", {
+          runId,
+          createdAt: new Date().toISOString()
+        });
+      }
+    }, 15_000);
+
+    req.on("close", close);
+
+    for (const event of agentRunner.getEvents(runId)) {
+      listener(event);
+      if (closed) return;
+    }
+
+    if (finalEventTypes.has(run.status)) {
+      close();
+    }
   });
 
   app.get("/api/agents/runs/:runId/artifacts", (req, res) => {
