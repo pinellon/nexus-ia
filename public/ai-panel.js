@@ -43,10 +43,14 @@ function initAiPanel() {
           startAgentProgress(data.run_id);
         }
         if (state.project) loadFiles(state.project.projectPath);
-        if (data.patch_ids?.length && typeof loadPatches === "function") {
+        if (data.patch_ids?.length) {
           if (state.agentProgress) mergeAgentPatchIds(data.patch_ids);
-          loadPatches();
-          showBottomPanel("patch");
+          if (typeof openPatchesPanel === "function") {
+            openPatchesPanel({ patchId: data.patch_ids[0], viewDiff: true });
+          } else if (typeof loadPatches === "function") {
+            loadPatches();
+            showBottomPanel("patch");
+          }
         }
         setTimeout(() => {
           if (state.stagedFiles?.length) {
@@ -58,11 +62,4 @@ function initAiPanel() {
     });
   }
 
-  document.addEventListener("devmind:action", (event) => {
-    const detail = event.detail || {};
-    if (detail.value === "patches" || detail.id === "open_patches") {
-      showBottomPanel("patch");
-      if (typeof loadPatches === "function") loadPatches();
-    }
-  });
 }

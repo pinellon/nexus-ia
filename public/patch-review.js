@@ -1,4 +1,4 @@
-/* global state, $, api, openFile, setStatus, detectLanguage, basename, escapeHtml, renderOpenFileTabs, renderFileTree, updateSaveStatus, logTerminal, showBottomPanel */
+﻿/* global state, $, api, openFile, setStatus, detectLanguage, basename, escapeHtml, renderOpenFileTabs, renderFileTree, updateSaveStatus, logTerminal, showBottomPanel */
 
 function riskClass(risk) {
   if (risk === "high") return "risk-high";
@@ -52,7 +52,8 @@ function showPatchReviewEmpty(message) {
 
 function showPatchReviewPanel() {
   $("#patch-review-empty").style.display = "none";
-  $("#patch-review-layout").style.display = "grid";
+  $("#patch-review-layout").style.display = "flex";
+  layoutDiffEditor();
 }
 
 function disposeDiffModels() {
@@ -63,33 +64,83 @@ function disposeDiffModels() {
   }
 }
 
+function createDiffEditorInstance() {
+  if (state.diffEditor) return state.diffEditor;
+  const host = $("#monaco-diff-editor");
+  if (!host) throw new Error("Area de diff nao encontrada no painel Patch Review.");
+  state.diffEditor = monaco.editor.createDiffEditor(host, {
+    automaticLayout: true,
+    renderSideBySide: state.diffSideBySide,
+    readOnly: true,
+    minimap: { enabled: false },
+    fontSize: 13,
+    scrollBeyondLastLine: false,
+    theme: "vs-dark"
+  });
+  if (!state.diffResizeObserver && typeof ResizeObserver !== "undefined") {
+    const shell = host.closest(".monaco-diff-shell");
+    if (shell) {
+      state.diffResizeObserver = new ResizeObserver(() => state.diffEditor?.layout());
+      state.diffResizeObserver.observe(shell);
+    }
+  }
+  return state.diffEditor;
+}
+
 function ensureMonacoDiff() {
   if (state.monacoDiffReady) return state.monacoDiffReady;
   state.monacoDiffReady = new Promise((resolve, reject) => {
     const fail = () => {
       reject(new Error("Monaco Editor nao carregou. Verifique internet ou use build local no proximo passo."));
     };
+    const done = () => {
+      try {
+        resolve(createDiffEditorInstance());
+      } catch (error) {
+        reject(error);
+      }
+    };
+    if (typeof monaco !== "undefined" && monaco.editor?.createDiffEditor) {
+      done();
+      return;
+    }
+    if (state.monacoReady) {
+      state.monacoReady.then(done).catch(fail);
+      return;
+    }
     if (!window.require) {
       fail();
       return;
     }
     require.config({ paths: { vs: "https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.2/min/vs" } });
-    require(["vs/editor/editor.main"], () => {
-      if (!state.diffEditor) {
-        state.diffEditor = monaco.editor.createDiffEditor($("#monaco-diff-editor"), {
-          automaticLayout: true,
-          renderSideBySide: state.diffSideBySide,
-          readOnly: true,
-          minimap: { enabled: false },
-          fontSize: 13,
-          scrollBeyondLastLine: false,
-          theme: "vs-dark"
-        });
-      }
-      resolve(state.diffEditor);
-    }, fail);
+    require(["vs/editor/editor.main"], done, fail);
   });
   return state.monacoDiffReady;
+}
+
+function ensurePatchPanelHeight() {
+  const min = 340;
+  if (state.layout.bottomCollapsed) state.layout.bottomCollapsed = false;
+  if ((state.layout.bottomHeight || 0) < min) {
+    state.layout.bottomHeight = min;
+    if (typeof applyLayoutCss === "function") applyLayoutCss();
+    if (typeof saveLayoutToStorage === "function") saveLayoutToStorage();
+  }
+}
+
+function layoutDiffEditor() {
+  if (!state.diffEditor) return;
+  setTimeout(() => state.diffEditor.layout(), 40);
+  setTimeout(() => state.diffEditor.layout(), 180);
+}
+
+async function openPatchesPanel(options = {}) {
+  const { patchId, viewDiff = false } = options;
+  ensurePatchPanelHeight();
+  showBottomPanel("patch");
+  await loadPatches();
+  const targetId = patchId || (viewDiff && state.patches[0]?.id) || null;
+  if (targetId) await viewPatch(targetId);
 }
 
 function getPatchFileEntries(patch) {
@@ -190,7 +241,7 @@ async function showPatchDiff(patch, filePath) {
   state.diffModels = { original, modified };
   state.diffEditor.setModel({ original, modified });
   state.diffEditor.updateOptions({ renderSideBySide: state.diffSideBySide });
-  setTimeout(() => state.diffEditor.layout(), 30);
+  layoutDiffEditor();
 }
 
 function hideStalePatchAlert() {
@@ -274,7 +325,7 @@ function renderPatchSidebar() {
     .map((p) => {
       const filePath = patchPrimaryPath(p);
       return `
-        <article class="patch-sidebar-card ${p.id === state.activePatchId ? "active" : ""}">
+        <article class="patch-sidebar-card ${p.id === state.activePatchId ? "active" : ""}" data-patch-card="${escapeHtml(p.id)}" tabindex="0" role="button">
           <div class="patch-sidebar-card-head">
             <span class="patch-sidebar-id">${escapeHtml(p.id)}</span>
             ${riskBadge(p.risk)}
@@ -292,11 +343,24 @@ function renderPatchSidebar() {
     })
     .join("");
   list.querySelectorAll("[data-view-patch]").forEach((btn) => {
-    btn.addEventListener("click", () => viewPatch(btn.dataset.viewPatch));
+    btn.addEventListener("click", (event) => {
+      event.stopPropagation();
+      viewPatch(btn.dataset.viewPatch);
+    });
+  });
+  list.querySelectorAll("[data-patch-card]").forEach((card) => {
+    card.addEventListener("click", () => viewPatch(card.dataset.patchCard));
+    card.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        viewPatch(card.dataset.patchCard);
+      }
+    });
   });
 }
 
 window.viewPatch = async function viewPatch(id) {
+  ensurePatchPanelHeight();
   showBottomPanel("patch");
   try {
     const res = await api("/api/patches/" + encodeURIComponent(id));
@@ -432,10 +496,13 @@ window.rejectPatch = async function rejectPatch(id) {
   }
 };
 
+window.openPatchesPanel = openPatchesPanel;
+
 document.addEventListener("devmind:action", (event) => {
   const detail = event.detail || {};
-  if (detail.value === "patches" || detail.id === "open_patches") {
-    showBottomPanel("patch");
-    loadPatches();
+  if (detail.value === "patches" || detail.id === "open_patches" || detail.id === "view_patch_diff") {
+    const patchId = detail.patchId || detail.patchIds?.[0];
+    const viewDiff = detail.id === "view_patch_diff" || detail.openDiff === true;
+    openPatchesPanel({ patchId, viewDiff: viewDiff || !!patchId });
   }
 });

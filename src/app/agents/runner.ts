@@ -8,18 +8,18 @@ import { ProjectHistoryManager } from "./history.js";
 import { toolRegistry } from "./tools.js";
 import { nowIso } from "./utils.js";
 import { AIProviderRouter } from "../ai/provider-router.js";
-import { addStagedFile, listStagedFiles } from "../web/staged-files.js";
+import {
+  defaultPathForAgent,
+  detectProjectStack,
+  generateCodeWithLLM
+} from "./code-generation.js";
+import { extractRequestedFilePath, isCodeCreationGoal, shouldRequirePlan } from "./routing.js";
 import { agentRunStore } from "../runs/run-store.js";
 import { runEventBus } from "../runs/run-event-bus.js";
 
 function matchGoal(goal: string, terms: string[]) {
   const lowered = goal.toLowerCase();
   return terms.some((term) => lowered.includes(term));
-}
-
-function extractRequestedFilePath(goal: string) {
-  const match = goal.match(/(?:crie|criar|create|gere|gerar)\s+(?:um\s+)?arquivo\s+([a-z0-9_./-]+\.[a-z0-9]+)/i);
-  return match?.[1]?.replace(/^\.?\//, "") ?? null;
 }
 
 function buildRequestedFileContent(run: AgentRun, targetPath: string) {
@@ -56,6 +56,20 @@ Nexus Codex e um assistente de programacao com IA focado em entender o projeto, 
   }
 
   return `Gerado pelo Nexus Codex para o objetivo:\n${run.userGoal}\n`;
+}
+
+const GENERATED_README_DRAFT_PATH = "docs/drafts/readme-draft.md";
+
+function getGeneratedDocsDraftPath(data: unknown) {
+  if (
+    data &&
+    typeof data === "object" &&
+    "readmePath" in data &&
+    typeof (data as { readmePath?: unknown }).readmePath === "string"
+  ) {
+    return (data as { readmePath: string }).readmePath;
+  }
+  return GENERATED_README_DRAFT_PATH;
 }
 
 function createPlanMarkdown(agent: AgentDefinition, run: AgentRun, historySummary?: string | null) {
@@ -243,9 +257,102 @@ export class AgentRunner {
       case "backend_agent":
       case "ui_agent":
       case "refactor_agent":
+        return this.executeCodeAgentScenario(agent, run);
       default:
-        return this.executeGeneralScenario(agent, run);
+        return isCodeCreationGoal(run.userGoal)
+          ? this.executeCodeAgentScenario(agent, run)
+          : this.executeGeneralScenario(agent, run);
     }
+  }
+
+  private async executeCodeAgentScenario(agent: AgentDefinition, run: AgentRun): Promise<boolean> {
+    if (!isCodeCreationGoal(run.userGoal)) {
+      return this.executeGeneralScenario(agent, run);
+    }
+
+    if (run.userGoal.includes("++CONFIRM_PLAN++")) {
+      return this.executeCodegenFlow(agent, run, run.userGoal.replace("++CONFIRM_PLAN++", "").trim());
+    }
+
+    if (shouldRequirePlan(run.userGoal)) {
+      return this.proposePlanPatch(agent, run, run.userGoal);
+    }
+
+    return this.executeCodegenFlow(agent, run, run.userGoal);
+  }
+
+  private async proposePlanPatch(agent: AgentDefinition, run: AgentRun, goal: string): Promise<boolean> {
+    await this.emitEvent(run, "planning", "Gerando plano de execucao...");
+    const planRouter = new AIProviderRouter();
+    const planRes = await planRouter.routeChatRequest({
+      messages: [
+        {
+          role: "user",
+          content: `Crie um plano curto (max 6 linhas) para: "${goal}". Liste arquivos e estilo visual.`
+        }
+      ],
+      context: "Planejador Nexus Codex",
+      goal
+    });
+
+    await this.runTool(agent, run, "propose_patch", {
+      path: "Plano de Criacao",
+      updatedContent: planRes.response || "Plano indisponivel.",
+      reason: "++PLAN_PROPOSAL++"
+    });
+    return true;
+  }
+
+  private async executeCodegenFlow(agent: AgentDefinition, run: AgentRun, goal: string): Promise<boolean> {
+    await this.emitEvent(run, "planning", "Gerando codigo com IA...");
+
+    let path: string;
+    let content: string;
+    let stack: Awaited<ReturnType<typeof detectProjectStack>>;
+    let provider = "fallback";
+    let model: string | null = null;
+
+    try {
+      const generated = await generateCodeWithLLM({ agent, run, goal });
+      path = generated.path;
+      content = generated.content;
+      stack = generated.stack;
+      provider = generated.provider;
+      model = generated.model;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      stack = await detectProjectStack(run.projectRoot);
+      path = extractRequestedFilePath(goal) || defaultPathForAgent(agent.id, stack);
+      content = buildRequestedFileContent(run, path);
+      await this.emitEvent(
+        run,
+        "tool_result",
+        `IA indisponivel (${message.slice(0, 160)}). Foi criado um rascunho basico — configure OpenAI/Ollama em Configuracoes > IA e peca de novo.`,
+        "warning"
+      );
+    }
+    const fileExt = path.split(".").pop() || "";
+
+    await this.emitEvent(run, "file_created", `Arquivo em staging: ${path}`, "info", {
+      path,
+      provider,
+      model
+    });
+
+    if (fileExt === "html") {
+      await this.emitEvent(run, "preview_ready", `Preview disponivel para ${path}`, "info", {
+        path,
+        url: `/preview/staged/${run.id}/index.html`
+      });
+    }
+
+    const patchResult = await this.runTool(agent, run, "propose_patch", {
+      path,
+      updatedContent: content,
+      reason: `Codigo gerado por ${agent.name} (${stack.name}) para: ${goal}`
+    });
+
+    return Boolean(patchResult.requiresApproval);
   }
 
   private async executeDocsScenario(agent: AgentDefinition, run: AgentRun) {
@@ -266,9 +373,9 @@ export class AgentRunner {
     }
 
     const patchResult = await this.runTool(agent, run, "propose_patch", {
-      path: "README.md",
+      path: getGeneratedDocsDraftPath(generated.data),
       updatedContent: content,
-      reason: `Atualizacao de README proposta a partir do objetivo: ${run.userGoal}`
+      reason: `Rascunho de documentacao proposto a partir do objetivo: ${run.userGoal}`
     });
 
     return Boolean(patchResult.requiresApproval);
@@ -323,9 +430,9 @@ export class AgentRunner {
       const readme = await this.runTool(agent, run, "generate_readme", {});
       if (typeof readme.data?.content === "string") {
         const patchResult = await this.runTool(agent, run, "propose_patch", {
-          path: "README.md",
+          path: getGeneratedDocsDraftPath(readme.data),
           updatedContent: readme.data.content,
-          reason: "README proposto pelo debug agent para documentar correcao ou contexto"
+          reason: "Rascunho de documentacao proposto pelo debug agent para documentar correcao ou contexto"
         });
         return Boolean(patchResult.requiresApproval);
       }
@@ -334,15 +441,10 @@ export class AgentRunner {
     return false;
   }
 
-  private async executeGeneralScenario(agent: AgentDefinition, run: AgentRun) {
+  private async executeGeneralScenario(agent: AgentDefinition, run: AgentRun): Promise<boolean> {
     const requestedFilePath = extractRequestedFilePath(run.userGoal);
     if (requestedFilePath) {
-      const patchResult = await this.runTool(agent, run, "propose_patch", {
-        path: requestedFilePath,
-        updatedContent: buildRequestedFileContent(run, requestedFilePath),
-        reason: `Arquivo solicitado pelo usuario via ${agent.name}`
-      });
-      return Boolean(patchResult.requiresApproval);
+      return this.executeCodegenFlow(agent, run, run.userGoal);
     }
 
     if (matchGoal(run.userGoal, ["readme", "docs", "document"])) {
@@ -350,7 +452,7 @@ export class AgentRunner {
       const content = typeof generated.data?.content === "string" ? generated.data.content : "";
       if (content) {
         const patchResult = await this.runTool(agent, run, "propose_patch", {
-          path: "README.md",
+          path: getGeneratedDocsDraftPath(generated.data),
           updatedContent: content,
           reason: `Draft de documentacao proposto por ${agent.name}`
         });
@@ -374,114 +476,7 @@ export class AgentRunner {
   }
 
   private async executeSiteBuilderScenario(agent: AgentDefinition, run: AgentRun) {
-    const isConfirmingPlan = run.userGoal.includes("++CONFIRM_PLAN++");
-    const actualGoal = run.userGoal.replace("++CONFIRM_PLAN++", "").trim();
-
-    if (!isConfirmingPlan) {
-      await this.emitEvent(run, "planning", "Gerando plano de execução...");
-      const planRouter = new AIProviderRouter();
-      const planRes = await planRouter.routeChatRequest({
-        messages: [{ role: "user", content: `Crie um plano EXTREMAMENTE CURTO (max 5 linhas) para criar: "${actualGoal}". Liste apenas o que será feito e o estilo.` }],
-        context: "Você é o planejador do Nexus.",
-        goal: actualGoal
-      });
-      
-      const planId = `plan_${randomUUID().slice(0, 8)}`;
-      // Emitimos o plano usando a estrutura de patch para facilitar, mas com um tipo diferente
-      await this.runTool(agent, run, "propose_patch", {
-        path: "Plano de Criação",
-        updatedContent: planRes.response,
-        reason: "++PLAN_PROPOSAL++"
-      });
-      return true;
-    }
-
-    await this.emitEvent(run, "planning", "Analisando projeto e gerando código usando IA...");
-    
-    let detectedStack = "html";
-    let defaultPath = "public/index.html";
-    try {
-      const pkgRaw = await readProjectFile(run.projectRoot, "package.json");
-      const pkg = JSON.parse(pkgRaw.content);
-      const deps = { ...pkg.dependencies, ...pkg.devDependencies };
-      if (deps["next"]) { detectedStack = "Next.js"; defaultPath = "app/page.tsx"; }
-      else if (deps["vue"]) { detectedStack = "Vue"; defaultPath = "src/App.vue"; }
-      else if (deps["svelte"] || deps["@sveltejs/kit"]) { detectedStack = "Svelte"; defaultPath = "src/routes/+page.svelte"; }
-      else if (deps["react"] || deps["vite"]) { detectedStack = "React/Vite"; defaultPath = "src/App.tsx"; }
-    } catch(e) {}
-
-    const draftPath = extractRequestedFilePath(actualGoal) || defaultPath;
-    const fileExt = draftPath.split('.').pop() || "html";
-    const languageMap: Record<string, string> = { tsx: "typescript", ts: "typescript", js: "javascript", jsx: "javascript", vue: "vue", svelte: "svelte", html: "html" };
-    const language = languageMap[fileExt] || "text";
-    
-    const stagedFiles = await listStagedFiles();
-    const existingStaged = stagedFiles.find(f => f.path === draftPath);
-    
-    const router = new AIProviderRouter();
-    
-    let prompt = `Você é o Builder Agent.\nO usuário pediu: "${actualGoal}"\nStack detectada no projeto: ${detectedStack}\nArquivo alvo: ${draftPath}\n\n`;
-    
-    if (existingStaged) {
-       prompt += `
-Você está CONTINUANDO a edição do arquivo existente.
-Este é o conteúdo atual do arquivo em staging:
-\`\`\`${language}
-${existingStaged.content}
-\`\`\`
-
-Modifique o código acima para atender ao pedido do usuário. Mantenha a estrutura consistente com a stack do projeto (${detectedStack}).
-Retorne APENAS o novo código completo dentro de um bloco \`\`\`${language} ... \`\`\`
-`;
-    } else {
-       prompt += `
-Por favor, crie o código completo e funcional para este arquivo.
-Use a stack detectada (${detectedStack}). Seja criativo, use um design moderno, limpo, vibrante e responsivo. Não use placeholders de imagens se não for necessário.
-Retorne APENAS o código completo dentro de um bloco \`\`\`${language} ... \`\`\`
-`;
-    }
-
-    const response = await router.routeChatRequest({
-      messages: [{ role: "user", content: prompt }],
-      context: "Você está criando ou editando um site.",
-      goal: run.userGoal
-    });
-
-    let content = response.response || buildRequestedFileContent(run, draftPath);
-    const codeMatch = content.match(/```(?:html|tsx|ts|js|jsx|vue|svelte|javascript|typescript)?\s*([\s\S]*?)```/);
-    if (codeMatch) {
-      content = codeMatch[1].trim();
-    }
-
-    // Criar/Atualizar Staged File
-    const file = await addStagedFile({
-      path: draftPath,
-      language,
-      content,
-      source: "site_builder_agent",
-      run_id: run.id
-    });
-
-    await this.emitEvent(run, "file_created", `Arquivo criado em staging: ${draftPath}`, "info", {
-      path: draftPath,
-      staged_id: file.id,
-      content: content
-    });
-    
-    if (fileExt === "html") {
-      await this.emitEvent(run, "preview_ready", `Preview disponível para ${draftPath}`, "info", {
-        path: draftPath,
-        url: `/preview/staged/${run.id}/index.html`
-      });
-    }
-
-    const patchResult = await this.runTool(agent, run, "propose_patch", {
-      path: draftPath,
-      updatedContent: content,
-      reason: `Código final gerado por ${agent.name} para o pedido: ${run.userGoal}`
-    });
-
-    return Boolean(patchResult.requiresApproval);
+    return this.executeCodeAgentScenario(agent, run);
   }
 
   private async runTool(agent: AgentDefinition, run: AgentRun, toolName: ToolName, input: Record<string, unknown>) {

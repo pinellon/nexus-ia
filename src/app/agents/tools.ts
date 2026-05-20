@@ -454,7 +454,7 @@ ${packageSummary}
     toolName: "generate_readme",
     summary: "Rascunho de README gerado",
     data: {
-      readmePath: "README.md",
+      readmePath: "docs/drafts/readme-draft.md",
       content: draft
     },
     artifactIds: [artifact.id]

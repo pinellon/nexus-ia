@@ -33,7 +33,7 @@ const DEFAULTS: AISettings = {
   requirePremiumConfirmation: false,
   providers: {
     anthropic:   { enabled: true,  apiKey: "", model: "claude-sonnet-4-20250514" },
-    openai:      { enabled: false, apiKey: "", model: "gpt-4.1" },
+    openai:      { enabled: false, apiKey: "", model: "gpt-4o-mini" },
     gemini:      { enabled: false, apiKey: "", model: "gemini-2.5-pro" },
     groq:        { enabled: false, apiKey: "", model: "llama-3.3-70b-versatile" },
     openrouter:  { enabled: false, apiKey: "", model: "anthropic/claude-sonnet-4" },
@@ -43,12 +43,21 @@ const DEFAULTS: AISettings = {
 
 let cached: AISettings | null = null;
 
-export async function loadAISettings(): Promise<AISettings> {
-  if (cached) return cached;
+export function clearAISettingsCache() {
+  cached = null;
+}
+
+export async function loadAISettings(forceReload = false): Promise<AISettings> {
+  if (cached && !forceReload) return cached;
   try {
     const raw = await readFile(SETTINGS_PATH, "utf8");
-    cached = { ...DEFAULTS, ...JSON.parse(raw) };
-    return cached!;
+    const parsed = JSON.parse(raw) as Partial<AISettings>;
+    cached = {
+      ...DEFAULTS,
+      ...parsed,
+      providers: { ...DEFAULTS.providers, ...parsed.providers }
+    };
+    return cached;
   } catch {
     // Fall back to env vars
     const s: AISettings = JSON.parse(JSON.stringify(DEFAULTS));
@@ -106,6 +115,7 @@ export async function saveAISettings(updates: Partial<AISettings> & { providers?
 
   await mkdir(path.dirname(SETTINGS_PATH), { recursive: true });
   await writeFile(SETTINGS_PATH, JSON.stringify(next, null, 2), "utf8");
+  clearAISettingsCache();
   cached = next;
   return next;
 }

@@ -8,35 +8,10 @@ import type { AgentEvent, AgentRunStatus } from "../agents/models.js";
 import { runEventBus } from "../runs/run-event-bus.js";
 import { addStagedFile, applyStagedFile, clearStagedFiles, getStagedFile, listStagedFiles, removeStagedFile } from "./staged-files.js";
 import { aiRateLimiter } from "../../rate-limit.js";
+import { suggestAgentId } from "../agents/routing.js";
 
 const contextBuilder = new ContextBuilder();
 const finalEventTypes = new Set(["completed", "failed", "cancelled", "interrupted", "needs_approval"]);
-
-function suggestAgentId(goal: string) {
-  const lowered = goal.toLowerCase();
-  if (/(erro|build|typecheck|teste|debug|falha|corrig)/.test(lowered)) {
-    return "debug_agent";
-  }
-  if (/(readme|docs|documenta|changelog|markdown)/.test(lowered)) {
-    return "docs_agent";
-  }
-  if (/(landing|site|dashboard|preview)/.test(lowered)) {
-    return "site_builder_agent";
-  }
-  if (/(tela|home|ui|layout|responsiv|visual|componente)/.test(lowered)) {
-    return "ui_agent";
-  }
-  if (/(api|backend|endpoint|auth|banco|persist)/.test(lowered)) {
-    return "backend_agent";
-  }
-  if (/(refactor|arquitetura|organiza|limp)/.test(lowered)) {
-    return "refactor_agent";
-  }
-  if (/(seguran|token|secret|vulner)/.test(lowered)) {
-    return "security_agent";
-  }
-  return "ui_agent";
-}
 
 function readLatestUserMessage(messages: unknown) {
   if (!Array.isArray(messages)) {
@@ -79,15 +54,30 @@ function wait(ms: number) {
 async function waitForSettledRun(runId: string) {
   const activeStatuses = new Set<AgentRunStatus>(["started", "planning", "running"]);
 
-  for (let attempt = 0; attempt < 24; attempt += 1) {
+  for (let attempt = 0; attempt < 8; attempt += 1) {
     const run = agentRunner.getRun(runId);
     if (!run || !activeStatuses.has(run.status)) {
       return run;
     }
-    await wait(75);
+    await wait(100);
   }
 
   return agentRunner.getRun(runId);
+}
+
+function collectPatchPaths(runId: string) {
+  const paths = new Set<string>();
+  for (const artifact of agentRunner.getArtifacts(runId)) {
+    const path = artifact.metadata?.path;
+    if (typeof path === "string" && path.trim()) {
+      paths.add(path);
+    }
+    if (artifact.title?.includes(" for ")) {
+      const fromTitle = artifact.title.split(" for ").pop()?.trim();
+      if (fromTitle) paths.add(fromTitle);
+    }
+  }
+  return Array.from(paths);
 }
 
 function collectPatchIds(runId: string) {
@@ -230,6 +220,7 @@ export function registerAgentRoutes(app: Express) {
       const settledRun = await waitForSettledRun(run.id);
       const artifacts = agentRunner.getArtifacts(run.id);
       const patchIds = collectPatchIds(run.id);
+      const patchPaths = collectPatchPaths(run.id);
       const agentMessage = patchIds.length
         ? "Criei uma execucao de agente e preparei patch para revisao."
         : "Criei uma execucao de agente para analisar o pedido.";
@@ -248,6 +239,7 @@ export function registerAgentRoutes(app: Express) {
         agent_id: agentId,
         status: settledRun?.status ?? run.status,
         patch_ids: patchIds,
+        patch_paths: patchPaths,
         artifacts: artifacts.map((artifact) => ({
           id: artifact.id,
           type: artifact.type,
