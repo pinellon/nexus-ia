@@ -39,8 +39,12 @@ function initAiPanel() {
         return originalGetContext();
       },
       onSuccess: (data) => {
+        if (data.run_id && typeof startAgentProgress === "function") {
+          startAgentProgress(data.run_id);
+        }
         if (state.project) loadFiles(state.project.projectPath);
         if (data.patch_ids?.length && typeof loadPatches === "function") {
+          if (state.agentProgress) mergeAgentPatchIds(data.patch_ids);
           loadPatches();
           showBottomPanel("patch");
         }

@@ -5,6 +5,15 @@ const state = {
   tree: [],
   patches: [],
   stagedFiles: [],
+  agentProgress: {
+    currentRunId: null,
+    status: "idle",
+    events: [],
+    patchIds: [],
+    source: null,
+    reconnectAttempts: 0,
+    reconnectTimer: null
+  },
   aiConfig: null,
   activeFile: null,
   activePath: null,

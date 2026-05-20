@@ -10,6 +10,7 @@ import { nowIso } from "./utils.js";
 import { AIProviderRouter } from "../ai/provider-router.js";
 import { addStagedFile, listStagedFiles } from "../web/staged-files.js";
 import { agentRunStore } from "../runs/run-store.js";
+import { runEventBus } from "../runs/run-event-bus.js";
 
 function matchGoal(goal: string, terms: string[]) {
   const lowered = goal.toLowerCase();
@@ -197,6 +198,7 @@ export class AgentRunner {
     });
 
     await this.updateRun(run, "running", "Executando ferramentas");
+    await this.emitEvent(run, "running", "Executando tarefa");
     const approvalRequested = await this.executeScenario(agent, run);
 
     if (run.cancelRequested || run.status === "cancelled") {
@@ -208,6 +210,9 @@ export class AgentRunner {
       run.updatedAt = nowIso();
       run.currentMessage = "Artefatos e patches aguardando revisao do usuario";
       await this.runStore.recordRunStatus(run.id, run.status);
+      if (!this.events.get(run.id)?.some((event) => event.type === "needs_approval")) {
+        await this.emitEvent(run, "needs_approval", "Aguardando revisao do usuario", "warning");
+      }
       return;
     }
 
@@ -618,6 +623,7 @@ Retorne APENAS o código completo dentro de um bloco \`\`\`${language} ... \`\`\
     run.updatedAt = event.createdAt;
     run.currentMessage = message;
     await this.runStore.recordRunEvent(event);
+    runEventBus.publish(run.id, event);
     return event;
   }
 
