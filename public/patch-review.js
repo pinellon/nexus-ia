@@ -106,6 +106,22 @@ function getPatchFileEntries(patch) {
   }));
 }
 
+function buildTextualDiffFallback(patch) {
+  const filePath = patchPrimaryPath(patch) || "patch";
+  const before = patch.before ?? "";
+  const after = patch.after ?? patch.content ?? "";
+  return [
+    `--- before/${filePath}`,
+    `+++ after/${filePath}`,
+    "",
+    "=== BEFORE ===",
+    before || "(empty)",
+    "",
+    "=== AFTER ===",
+    after || "(empty)"
+  ].join("\n");
+}
+
 function renderPatchMetadata(patch) {
   $("#patch-review-header").innerHTML = `
     <h3 class="patch-review-title">Patch ${escapeHtml(patch.type || "")} - ${escapeHtml(patchPrimaryPath(patch))}</h3>
@@ -153,7 +169,7 @@ function renderPatchActions(patch) {
     <button class="btn-primary" type="button" onclick="applyPatch('${id}')">Aplicar patch</button>
     <button class="btn-ghost" type="button" style="color:var(--red)" onclick="rejectPatch('${id}')">Rejeitar patch</button>
     <button class="btn-secondary" type="button" onclick="openPatchFile('${escapeHtml(patchPrimaryPath(patch))}')">Abrir arquivo</button>
-    <button class="btn-secondary" type="button" onclick="copyPatchDiff()">Copiar diff</button>
+    <button class="btn-secondary" type="button" onclick="copyPatchDiff()">Copiar diff textual</button>
     <button class="btn-secondary" type="button" onclick="togglePatchDiffLayout()">${state.diffSideBySide ? "Diff inline" : "Diff lado a lado"}</button>
     <button class="btn-secondary" type="button" onclick="runPatchCommand('typecheck')">Rodar typecheck</button>
     <button class="btn-secondary" type="button" onclick="runPatchCommand('build')">Rodar build</button>
@@ -308,11 +324,12 @@ window.openPatchFile = function openPatchFile(filePath) {
 
 window.copyPatchDiff = function copyPatchDiff() {
   const patch = state.activePatch;
-  if (!patch?.diff) {
-    setStatus("Nenhum diff disponivel.");
+  if (!patch) {
+    setStatus("Nenhum patch selecionado.");
     return;
   }
-  navigator.clipboard.writeText(patch.diff);
+  const diffText = patch.diff?.trim() ? patch.diff : buildTextualDiffFallback(patch);
+  navigator.clipboard.writeText(diffText);
   setStatus("Diff copiado para a area de transferencia.");
 };
 
