@@ -1,4 +1,4 @@
-/* global state, $, api, openTab, openFile, setStatus, detectLanguage, basename, escapeHtml, renderOpenFileTabs, renderFileTree, updateSaveStatus, toggleTerminal, logTerminal */
+/* global state, $, api, openFile, setStatus, detectLanguage, basename, escapeHtml, renderOpenFileTabs, renderFileTree, updateSaveStatus, logTerminal, showBottomPanel */
 
 function riskClass(risk) {
   if (risk === "high") return "risk-high";
@@ -7,8 +7,41 @@ function riskClass(risk) {
 }
 
 function riskBadge(risk) {
-  const cls = risk === "high" ? "err" : risk === "medium" ? "warn" : "ok";
-  return `<span class="badge ${cls} ${riskClass(risk)}">${escapeHtml(risk || "low")}</span>`;
+  const safeRisk = risk || "low";
+  const cls = safeRisk === "high" ? "err" : safeRisk === "medium" ? "warn" : "ok";
+  return `<span class="badge ${cls} ${riskClass(safeRisk)}">${escapeHtml(safeRisk)}</span>`;
+}
+
+function patchPrimaryPath(patch) {
+  return patch.path || patch.files_changed?.[0] || "";
+}
+
+function patchDate(value) {
+  if (!value) return "-";
+  try {
+    return new Date(value).toLocaleString();
+  } catch {
+    return value;
+  }
+}
+
+function getChatInput() {
+  return $("#dm-input") || $("#devmindChat textarea") || $("#devmindChat input");
+}
+
+function getChatSendButton() {
+  return $("#dm-send") || $("#devmindChat button[type='submit']") || $("#devmindChat form button");
+}
+
+function updatePatchTabBadge() {
+  const n = state.patches?.length || 0;
+  const act = $("#act-patches");
+  const badge = $("#patch-tab-badge");
+  if (act) act.dataset.count = String(n);
+  if (badge) {
+    badge.textContent = n > 0 ? String(n) : "";
+    badge.style.display = n > 0 ? "inline-flex" : "none";
+  }
 }
 
 function showPatchReviewEmpty(message) {
@@ -34,7 +67,7 @@ function ensureMonacoDiff() {
   if (state.monacoDiffReady) return state.monacoDiffReady;
   state.monacoDiffReady = new Promise((resolve, reject) => {
     const fail = () => {
-      reject(new Error("Monaco Editor não carregou. Verifique internet ou use build local no próximo passo."));
+      reject(new Error("Monaco Editor nao carregou. Verifique internet ou use build local no proximo passo."));
     };
     if (!window.require) {
       fail();
@@ -49,7 +82,8 @@ function ensureMonacoDiff() {
           readOnly: true,
           minimap: { enabled: false },
           fontSize: 13,
-          scrollBeyondLastLine: false
+          scrollBeyondLastLine: false,
+          theme: "vs-dark"
         });
       }
       resolve(state.diffEditor);
@@ -74,13 +108,13 @@ function getPatchFileEntries(patch) {
 
 function renderPatchMetadata(patch) {
   $("#patch-review-header").innerHTML = `
-    <h3 class="patch-review-title">Patch ${escapeHtml(patch.type || "")} — ${escapeHtml(patch.path || patch.files_changed?.[0] || "")}</h3>
+    <h3 class="patch-review-title">Patch ${escapeHtml(patch.type || "")} - ${escapeHtml(patchPrimaryPath(patch))}</h3>
     <div class="patch-review-meta">
       <div><span>ID</span><br><strong>${escapeHtml(patch.id)}</strong></div>
       <div><span>Agente</span><br><strong>${escapeHtml(patch.agent_id || "unknown")}</strong></div>
       <div><span>Status</span><br><strong>${escapeHtml(patch.status || "pending")}</strong></div>
       <div><span>Risco</span><br><strong>${riskBadge(patch.risk)}</strong></div>
-      <div><span>Criado</span><br><strong>${escapeHtml(patch.created_at || "-")}</strong></div>
+      <div><span>Criado</span><br><strong>${escapeHtml(patchDate(patch.created_at))}</strong></div>
       <div><span>Motivo</span><br><strong>${escapeHtml(patch.summary || patch.goal || "-")}</strong></div>
     </div>
   `;
@@ -118,7 +152,7 @@ function renderPatchActions(patch) {
   $("#patch-review-actions").innerHTML = `
     <button class="btn-primary" type="button" onclick="applyPatch('${id}')">Aplicar patch</button>
     <button class="btn-ghost" type="button" style="color:var(--red)" onclick="rejectPatch('${id}')">Rejeitar patch</button>
-    <button class="btn-secondary" type="button" onclick="openPatchFile('${escapeHtml(patch.path || patch.files_changed?.[0] || "")}')">Abrir arquivo</button>
+    <button class="btn-secondary" type="button" onclick="openPatchFile('${escapeHtml(patchPrimaryPath(patch))}')">Abrir arquivo</button>
     <button class="btn-secondary" type="button" onclick="copyPatchDiff()">Copiar diff</button>
     <button class="btn-secondary" type="button" onclick="togglePatchDiffLayout()">${state.diffSideBySide ? "Diff inline" : "Diff lado a lado"}</button>
     <button class="btn-secondary" type="button" onclick="runPatchCommand('typecheck')">Rodar typecheck</button>
@@ -154,7 +188,7 @@ function hideStalePatchAlert() {
 function showStalePatchAlert() {
   const el = $("#patch-stale-alert");
   el.style.display = "block";
-  el.textContent = "O arquivo mudou desde que este patch foi criado. Peça para a IA recalcular o patch.";
+  el.textContent = "O arquivo mudou desde que este patch foi criado. Peca para a IA recalcular o patch.";
   const recalc = $("#btn-recalc-patch");
   if (recalc) recalc.style.display = "inline-flex";
 }
@@ -200,10 +234,10 @@ async function loadPatches() {
       }).catch(() => {});
     }
 
-    $("#act-patches").dataset.count = state.patches.length;
+    updatePatchTabBadge();
     renderPatchSidebar();
     if (!state.patches.length) {
-      showPatchReviewEmpty("Nenhum patch pendente. Peça ao Nexus para criar ou modificar algo.");
+      showPatchReviewEmpty("Nenhum patch pendente. Peca ao Nexus para criar ou modificar algo.");
     } else if (state.activePatchId && !state.patches.find((p) => p.id === state.activePatchId)) {
       state.activePatchId = null;
       state.activePatch = null;
@@ -217,32 +251,44 @@ async function loadPatches() {
 function renderPatchSidebar() {
   const list = $("#patchListSidebar");
   if (!state.patches.length) {
-    list.innerHTML = '<div class="empty-state">Nenhum patch pendente.</div>';
+    list.innerHTML = '<div class="empty-state">Nenhum patch pendente. Peca ao Nexus para criar ou modificar algo.</div>';
     return;
   }
   list.innerHTML = state.patches
-    .map(
-      (p) => `
-    <div class="patch-sidebar-card ${p.id === state.activePatchId ? "active" : ""}" onclick="viewPatch('${p.id}')">
-      <div class="patch-sidebar-type">${escapeHtml(p.type)} ${riskBadge(p.risk)}</div>
-      <div class="patch-sidebar-path">${escapeHtml(p.path || p.summary || "-")}</div>
-    </div>
-  `
-    )
+    .map((p) => {
+      const filePath = patchPrimaryPath(p);
+      return `
+        <article class="patch-sidebar-card ${p.id === state.activePatchId ? "active" : ""}">
+          <div class="patch-sidebar-card-head">
+            <span class="patch-sidebar-id">${escapeHtml(p.id)}</span>
+            ${riskBadge(p.risk)}
+          </div>
+          <div class="patch-sidebar-path">${escapeHtml(filePath || "-")}</div>
+          <div class="patch-sidebar-meta">
+            <span>Agente: ${escapeHtml(p.agent_id || "unknown")}</span>
+            <span>Status: ${escapeHtml(p.status || "pending")}</span>
+            <span>Data: ${escapeHtml(patchDate(p.created_at))}</span>
+          </div>
+          <p class="patch-sidebar-summary">${escapeHtml(p.summary || p.goal || "-")}</p>
+          <button type="button" class="btn-secondary btn-sm" data-view-patch="${escapeHtml(p.id)}">Abrir diff</button>
+        </article>
+      `;
+    })
     .join("");
+  list.querySelectorAll("[data-view-patch]").forEach((btn) => {
+    btn.addEventListener("click", () => viewPatch(btn.dataset.viewPatch));
+  });
 }
 
 window.viewPatch = async function viewPatch(id) {
-  openTab("diff");
-  $("#diff-content").style.display = "none";
-  document.querySelector('.activity-btn[data-target="patches"]')?.click();
+  showBottomPanel("patch");
   try {
     const res = await api("/api/patches/" + encodeURIComponent(id));
     const patch = res.patch || res.data;
     if (!patch) return;
     state.activePatchId = id;
     state.activePatch = patch;
-    state.activePatchFilePath = patch.path || patch.files_changed?.[0] || null;
+    state.activePatchFilePath = patchPrimaryPath(patch) || null;
     hideStalePatchAlert();
     showPatchReviewPanel();
     renderPatchMetadata(patch);
@@ -257,18 +303,17 @@ window.viewPatch = async function viewPatch(id) {
 
 window.openPatchFile = function openPatchFile(filePath) {
   if (!filePath) return;
-  openTab("code");
   openFile(filePath);
 };
 
 window.copyPatchDiff = function copyPatchDiff() {
   const patch = state.activePatch;
   if (!patch?.diff) {
-    setStatus("Nenhum diff disponível.");
+    setStatus("Nenhum diff disponivel.");
     return;
   }
   navigator.clipboard.writeText(patch.diff);
-  setStatus("Diff copiado para a área de transferência.");
+  setStatus("Diff copiado para a area de transferencia.");
 };
 
 window.togglePatchDiffLayout = async function togglePatchDiffLayout() {
@@ -281,7 +326,7 @@ window.togglePatchDiffLayout = async function togglePatchDiffLayout() {
 };
 
 window.runPatchCommand = async function runPatchCommand(commandId) {
-  toggleTerminal();
+  showBottomPanel("terminal");
   logTerminal(">> npm run " + commandId);
   try {
     const res = await api("/api/commands/run", {
@@ -289,15 +334,16 @@ window.runPatchCommand = async function runPatchCommand(commandId) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ commandId })
     });
-    logTerminal(res.result?.stdout || "");
-    logTerminal(res.result?.stderr || "");
-    if (res.result?.exitCode !== 0) {
-      logTerminal("Comando falhou com código " + res.result?.exitCode);
+    const result = res.result || res.data || res;
+    logTerminal(result.stdout || "");
+    logTerminal(result.stderr || "");
+    if (result.exitCode !== 0) {
+      logTerminal("Comando falhou com codigo " + result.exitCode);
       const btn = `<button class="btn-primary" style="margin-top:10px" onclick="requestAiFixFromPatch('Corrija o erro do ${commandId}')">Corrigir erro com IA</button>`;
       $("#terminal-output").innerHTML += "<br>" + btn + "<br>";
     } else {
       logTerminal(">> Sucesso!");
-      setStatus(commandId + " concluído com sucesso.");
+      setStatus(commandId + " concluido com sucesso.");
     }
   } catch (e) {
     logTerminal("Erro: " + e.message);
@@ -305,19 +351,19 @@ window.runPatchCommand = async function runPatchCommand(commandId) {
 };
 
 window.requestAiFixFromPatch = function requestAiFixFromPatch(prefill) {
-  const input = $("#devmindChat input");
-  const form = $("#devmindChat form button");
+  const input = getChatInput();
   if (!input) return;
-  openTab("chat");
-  input.value = prefill || "Corrija o erro encontrado após aplicar o patch.";
-  form?.click();
+  input.value = prefill || "Corrija o erro encontrado apos aplicar o patch.";
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+  input.focus();
+  getChatSendButton()?.click();
 };
 
 window.recalculatePatchWithAi = function recalculatePatchWithAi() {
   const patch = state.activePatch;
   if (!patch) return;
   requestAiFixFromPatch(
-    `Recalcule o patch ${patch.id} para o arquivo ${patch.path || patch.files_changed?.[0] || ""} porque o arquivo mudou desde a proposta original.`
+    `Recalcule o patch ${patch.id} para o arquivo ${patchPrimaryPath(patch)} porque o arquivo mudou desde a proposta original.`
   );
 };
 
@@ -327,7 +373,7 @@ window.applyPatch = async function applyPatch(id) {
   const dirtyPaths = getDirtyPathsForPatch(patch);
   if (dirtyPaths.length) {
     alert(
-      "Este arquivo tem alterações manuais não salvas. Salve ou descarte antes de aplicar o patch.\n\n" +
+      "Este arquivo tem alteracoes manuais nao salvas. Salve ou descarte antes de aplicar o patch.\n\n" +
         dirtyPaths.join("\n")
     );
     return;
@@ -336,8 +382,8 @@ window.applyPatch = async function applyPatch(id) {
     hideStalePatchAlert();
     const res = await api(`/api/patches/pending/${id}/apply`, { method: "POST" });
     setStatus("Patch aplicado com sucesso");
-    const applied = res.patch || res.data || patch;
-    const filePath = applied.path || patch.path || patch.files_changed?.[0];
+    const applied = res.patch || res.data?.patch || res.data || patch;
+    const filePath = applied.path || patchPrimaryPath(patch);
     const afterContent = applied.after ?? patch.after ?? patch.content ?? "";
     if (filePath) await syncOpenFileAfterPatch(filePath, afterContent);
     state.activePatchId = null;
@@ -372,8 +418,7 @@ window.rejectPatch = async function rejectPatch(id) {
 document.addEventListener("devmind:action", (event) => {
   const detail = event.detail || {};
   if (detail.value === "patches" || detail.id === "open_patches") {
-    document.querySelector('.activity-btn[data-target="patches"]')?.click();
-    openTab("diff");
+    showBottomPanel("patch");
     loadPatches();
   }
 });

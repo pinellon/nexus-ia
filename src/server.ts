@@ -712,7 +712,9 @@ app.get("/api/patches", async (_req, res) => {
 
 app.get("/api/patches/pending", async (_req, res) => {
   try {
-    const pending = (await listPendingActions()).filter(isPatchAction);
+    const pending = (await listPendingActions()).filter(
+      (action) => isPatchAction(action) && (action.status === "pending" || action.status === "approved")
+    );
     const patches = await Promise.all(pending.map((action) => buildPatchPayload(action)));
     return res.json({
       ok: true,
@@ -1253,6 +1255,10 @@ app.use((_req, res) => {
   res.sendFile(path.join(publicDir, "index.html"));
 });
 
-app.listen(port, () => {
-  console.log(`Nexus IDE rodando em http://localhost:${port}`);
-});
+export { app };
+
+if (process.env.NODE_ENV !== "test" && !process.env.VITEST) {
+  app.listen(port, () => {
+    console.log(`Nexus IDE rodando em http://localhost:${port}`);
+  });
+}
