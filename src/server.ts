@@ -1104,6 +1104,54 @@ app.post("/api/tests/run", commandRateLimiter, async (req, res) => {
   }
 });
 
+app.post("/api/dev/fix-command", aiRateLimiter, async (req, res) => {
+  try {
+    const {
+      command = "",
+      stdout = "",
+      stderr = "",
+      exit_code,
+      active_file = "",
+      context = ""
+    } = req.body as {
+      command?: string;
+      stdout?: string;
+      stderr?: string;
+      exit_code?: number;
+      active_file?: string;
+      context?: string;
+    };
+
+    const goal = [
+      `Corrija o erro do comando: ${command || "validacao"}.`,
+      typeof exit_code === "number" ? `Exit code: ${exit_code}` : "",
+      active_file ? `Arquivo ativo: ${active_file}` : "",
+      stdout ? `STDOUT:\n${String(stdout).slice(0, 6_000)}` : "",
+      stderr ? `STDERR:\n${String(stderr).slice(0, 6_000)}` : "",
+      context ? `Contexto da IDE:\n${String(context).slice(0, 4_000)}` : ""
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+
+    const run = await import("./app/agents/runner.js").then(({ agentRunner }) =>
+      agentRunner.run_agent("debug_agent", goal, ".")
+    );
+
+    return res.status(202).json({
+      ok: true,
+      run_id: run.id,
+      agent_id: "debug_agent",
+      status: "started",
+      message: "Debug Agent iniciado com o erro do comando."
+    });
+  } catch (error) {
+    return res.status(400).json({
+      ok: false,
+      error: error instanceof Error ? error.message : "Falha ao iniciar correcao com Nexus"
+    });
+  }
+});
+
 app.get("/api/git/status", (_req, res) => {
   try {
     return res.json({

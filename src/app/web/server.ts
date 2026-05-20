@@ -103,6 +103,15 @@ function collectPatchIds(runId: string) {
   return Array.from(patchIds);
 }
 
+function collectPreviewUrl(runId: string) {
+  for (const event of agentRunner.getEvents(runId).slice().reverse()) {
+    if (event.type === "preview_ready" && typeof event.payload?.url === "string") {
+      return event.payload.url;
+    }
+  }
+  return null;
+}
+
 function buildNextActions(patchIds: string[]) {
   return [
     ...(patchIds.length
@@ -168,7 +177,8 @@ export function registerAgentRoutes(app: Express) {
     try {
       const context = await contextBuilder.buildContext({
         messages: normalizedMessages,
-        projectRoot: "."
+        projectRoot: ".",
+        extraContext: typeof project_context === "string" ? project_context : ""
       });
       const uiContext = typeof project_context === "string" ? project_context.slice(0, 10_000) : "";
       const routedContext = uiContext
@@ -221,6 +231,7 @@ export function registerAgentRoutes(app: Express) {
       const artifacts = agentRunner.getArtifacts(run.id);
       const patchIds = collectPatchIds(run.id);
       const patchPaths = collectPatchPaths(run.id);
+      const previewUrl = collectPreviewUrl(run.id);
       const agentMessage = patchIds.length
         ? "Criei uma execucao de agente e preparei patch para revisao."
         : "Criei uma execucao de agente para analisar o pedido.";
@@ -240,6 +251,7 @@ export function registerAgentRoutes(app: Express) {
         status: settledRun?.status ?? run.status,
         patch_ids: patchIds,
         patch_paths: patchPaths,
+        preview_url: previewUrl,
         artifacts: artifacts.map((artifact) => ({
           id: artifact.id,
           type: artifact.type,
@@ -248,6 +260,7 @@ export function registerAgentRoutes(app: Express) {
           action_id: artifact.actionId ?? null
         })),
         next_actions: buildNextActions(patchIds)
+          .concat(previewUrl ? [{ id: "open_preview", label: "Abrir preview", type: "preview", value: previewUrl }] : [])
           .concat(aiDecision.warning ? [{ id: "open_ai_settings", label: "Configurar IA", type: "view", value: "settings" }] : []),
         ai: {
           mode: aiDecision.mode,

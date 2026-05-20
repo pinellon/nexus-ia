@@ -52,6 +52,9 @@ function initAiPanel() {
             showBottomPanel("patch");
           }
         }
+        if (data.preview_url) {
+          setStatus("Preview pronto. Use o botao Abrir preview no chat.");
+        }
         setTimeout(() => {
           if (state.stagedFiles?.length) {
             $(".activity-btn[data-target='explorer']")?.click();
