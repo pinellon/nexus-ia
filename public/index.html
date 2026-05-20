@@ -251,6 +251,16 @@
     </footer>
   </div>
 
+  <div class="command-palette-overlay" id="command-palette-overlay" aria-hidden="true">
+    <div class="command-palette" role="dialog" aria-modal="true" aria-label="Command Palette">
+      <div class="command-palette-header">
+        <span class="command-palette-prompt">&gt;</span>
+        <input id="command-palette-input" class="command-palette-input" type="text" spellcheck="false" placeholder="Digite um comando...">
+      </div>
+      <div class="command-palette-list" id="command-palette-list"></div>
+    </div>
+  </div>
+
   <script src="/devmind.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.2/min/vs/loader.min.js"></script>
   <script src="/layout.js"></script>
@@ -262,6 +272,7 @@
   <script src="/ai-panel.js"></script>
   <script src="/search.js"></script>
   <script src="/sidebar-panels.js"></script>
+  <script src="/command-palette.js"></script>
   <script src="/app.js"></script>
 </body>
 </html>

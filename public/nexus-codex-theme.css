@@ -676,6 +676,131 @@ body {
   font-family: var(--font-mono);
 }
 
+.problem-list {
+  display: grid;
+  gap: 6px;
+}
+
+.problem-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.7fr) minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  width: 100%;
+  text-align: left;
+  border: 1px solid var(--border-nx2);
+  border-left: 3px solid var(--red, #ff6b6b);
+  border-radius: var(--radius);
+  background: var(--bg1);
+  color: var(--text-2);
+  padding: 8px 9px;
+  cursor: pointer;
+}
+
+.problem-row.warning {
+  border-left-color: var(--amber);
+}
+
+.problem-row:hover {
+  background: var(--bg3);
+}
+
+.problem-file {
+  color: var(--amber);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.problem-message {
+  color: var(--text-2);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.command-palette-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: none;
+  background: rgba(0, 0, 0, 0.34);
+  backdrop-filter: blur(2px);
+}
+
+.command-palette-overlay.open {
+  display: block;
+}
+
+.command-palette {
+  width: min(720px, calc(100vw - 32px));
+  margin: 7vh auto 0;
+  border: 1px solid var(--border-nx3);
+  border-radius: 14px;
+  background: var(--bg2);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+
+.command-palette-header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border-nx2);
+}
+
+.command-palette-prompt {
+  color: var(--amber);
+  font-family: var(--font-mono);
+  font-weight: 700;
+}
+
+.command-palette-input {
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--text-1);
+  font: inherit;
+  font-size: 15px;
+}
+
+.command-palette-list {
+  max-height: 420px;
+  overflow: auto;
+  padding: 8px;
+}
+
+.command-palette-row {
+  width: 100%;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text-1);
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: center;
+  padding: 10px 11px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.command-palette-row:hover,
+.command-palette-row.active {
+  border-color: var(--amber-dim);
+  background: var(--amber-glow);
+}
+
+.command-palette-row small,
+.command-palette-empty {
+  color: var(--text-3);
+}
+
+.command-palette-empty {
+  padding: 18px;
+  text-align: center;
+}
+
 .problem-title {
   color: var(--amber);
   font-weight: 700;

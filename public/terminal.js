@@ -63,6 +63,38 @@ function clearTerminal() {
   if (output) output.textContent = "";
 }
 
+function parseProblemsFromCommand(result) {
+  const text = [result.stderr, result.stdout].filter(Boolean).join("\n");
+  const problems = [];
+  const patterns = [
+    /(?:^|\n)([A-Za-z0-9_./\\-]+\.(?:ts|tsx|js|jsx|json|css|html|md|py))\((\d+),(\d+)\):\s*(error|warning)?\s*([^:\n]*)?:?\s*([^\n]*)/g,
+    /(?:^|\n)([A-Za-z0-9_./\\-]+\.(?:ts|tsx|js|jsx|json|css|html|md|py)):(\d+):(\d+)[:\s]+([^\n]*)/g,
+    /(?:^|\n)([A-Za-z0-9_./\\-]+\.(?:ts|tsx|js|jsx|json|css|html|md|py)):(\d+)[:\s]+([^\n]*)/g
+  ];
+
+  for (const pattern of patterns) {
+    let match;
+    while ((match = pattern.exec(text))) {
+      const hasColumn = match.length >= 6;
+      const filePath = String(match[1] || "").replace(/\\/g, "/").replace(/^\.?\//, "");
+      const line = Number(match[2] || 1);
+      const column = hasColumn ? Number(match[3] || 1) : 1;
+      const message = (hasColumn ? [match[4], match[5], match[6]] : [match[3]]).filter(Boolean).join(" ").trim();
+      if (!problems.some((item) => item.filePath === filePath && item.line === line && item.column === column)) {
+        problems.push({
+          filePath,
+          line,
+          column,
+          message: message || "Problema detectado pelo comando",
+          severity: /warn/i.test(message) ? "warning" : "error"
+        });
+      }
+    }
+  }
+
+  return problems.slice(0, 50);
+}
+
 function renderProblemsFromCommand(result) {
   const body = $("#problems-body");
   if (!body) return;
@@ -72,14 +104,39 @@ function renderProblemsFromCommand(result) {
   }
   const command = result.command || "validacao";
   const output = [result.stderr, result.stdout].filter(Boolean).join("\n").slice(0, 6000);
+  const problems = parseProblemsFromCommand(result);
   body.innerHTML = `
     <div class="problem-card">
       <div class="problem-title">Falha em ${escapeHtml(command)}</div>
       <div class="problem-meta">Exit code: ${escapeHtml(result.exit_code ?? result.exitCode ?? "-")}</div>
+      ${
+        problems.length
+          ? `<div class="problem-list">
+              ${problems
+                .map(
+                  (problem, index) => `
+                    <button type="button" class="problem-row ${problem.severity}" data-problem-index="${index}">
+                      <span class="problem-file">${escapeHtml(problem.filePath)}:${problem.line}:${problem.column}</span>
+                      <span class="problem-message">${escapeHtml(problem.message)}</span>
+                    </button>
+                  `
+                )
+                .join("")}
+            </div>`
+          : ""
+      }
       <pre>${escapeHtml(output || "Sem output.")}</pre>
       <button type="button" class="btn-primary btn-sm" id="btn-fix-last-command">Corrigir com Nexus</button>
     </div>
   `;
+  state.lastProblems = problems;
+  body.querySelectorAll("[data-problem-index]").forEach((row) => {
+    row.addEventListener("click", () => {
+      const problem = problems[Number(row.dataset.problemIndex)];
+      if (!problem) return;
+      openFile(problem.filePath, null, { line: problem.line, column: problem.column });
+    });
+  });
   $("#btn-fix-last-command")?.addEventListener("click", () => fixLastCommandWithNexus());
 }
 
