@@ -167,6 +167,12 @@ async function loadHealth() {
   if (proj) proj.textContent = res.project?.projectName || "Nenhum";
   const mode = $("#status-mode");
   if (mode) mode.textContent = `IA: ${res.mode || "Auto"}`;
+  const providerLabel = $("#status-provider-label");
+  if (providerLabel) {
+    const provider = res.ai?.provider || res.provider || res.mode || "auto";
+    const model = res.ai?.model || res.model || "";
+    providerLabel.textContent = model ? `${provider} · ${model}` : String(provider);
+  }
   if (res.project?.projectPath) loadFiles(res.project.projectPath);
 }
 
@@ -304,8 +310,12 @@ window.NexusIDE = {
 function activateSideView(target) {
   if (!target) return;
   if (target === "patches") {
-    showBottomPanel("patch");
-    if (typeof loadPatches === "function") loadPatches();
+    if (typeof openPatchesPanel === "function") {
+      openPatchesPanel({ viewDiff: !!state.patches?.[0]?.id, patchId: state.patches?.[0]?.id });
+    } else {
+      showBottomPanel("patch");
+      if (typeof loadPatches === "function") loadPatches();
+    }
     $all(".activity-btn[data-target]").forEach((b) =>
       b.classList.toggle("active", b.dataset.target === "patches")
     );

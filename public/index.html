@@ -4,19 +4,35 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Nexus Codex</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@vscode/codicons@0.0.36/dist/codicon.css">
   <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/nexus-codex-theme.css">
 </head>
 <body>
   <div class="ide-shell" id="ide-shell">
     <!-- Activity Bar -->
     <nav class="activity-bar" aria-label="Activity Bar">
-      <button type="button" class="activity-btn active" data-target="explorer" title="Explorer (Ctrl+Shift+E)"><i class="codicon codicon-files"></i></button>
-      <button type="button" class="activity-btn" data-target="search" title="Buscar (Ctrl+Shift+F)"><i class="codicon codicon-search"></i></button>
-      <button type="button" class="activity-btn" data-target="git" title="Git"><i class="codicon codicon-source-control"></i></button>
-      <button type="button" class="activity-btn" data-target="sessions" title="Sessões"><i class="codicon codicon-comment-discussion"></i></button>
-      <button type="button" class="activity-btn" data-target="patches" title="Patches" id="act-patches" data-count="0"><i class="codicon codicon-diff"></i></button>
-      <button type="button" class="activity-btn activity-btn-bottom" data-target="settings" title="Configurações"><i class="codicon codicon-gear"></i></button>
+      <div class="nexus-logo" title="Nexus Codex" aria-hidden="true">N</div>
+      <button type="button" class="activity-btn active" data-target="explorer" title="Explorer (Ctrl+Shift+E)">
+        <i class="codicon codicon-files"></i><span class="nav-tooltip">Explorer</span>
+      </button>
+      <button type="button" class="activity-btn" data-target="search" title="Buscar (Ctrl+Shift+F)">
+        <i class="codicon codicon-search"></i><span class="nav-tooltip">Buscar</span>
+      </button>
+      <button type="button" class="activity-btn" data-target="git" title="Git">
+        <i class="codicon codicon-source-control"></i><span class="nav-tooltip">Git</span>
+      </button>
+      <button type="button" class="activity-btn" data-target="sessions" title="Sessões">
+        <i class="codicon codicon-comment-discussion"></i><span class="nav-tooltip">Sessões</span>
+      </button>
+      <button type="button" class="activity-btn" data-target="patches" title="Patches" id="act-patches" data-count="0">
+        <i class="codicon codicon-diff"></i><span class="nav-tooltip">Patches</span>
+      </button>
+      <button type="button" class="activity-btn activity-btn-bottom" data-target="settings" title="Configurações">
+        <i class="codicon codicon-gear"></i><span class="nav-tooltip">Configurações</span>
+      </button>
     </nav>
 
     <!-- Sidebar -->
@@ -109,6 +125,7 @@
         <div class="monaco-shell">
           <div id="editor-welcome" class="editor-welcome">
             <div class="editor-welcome-inner">
+              <div class="editor-welcome-logo" aria-hidden="true">N</div>
               <h1 class="editor-welcome-title">Nexus Codex</h1>
               <p class="editor-welcome-sub">Abra um arquivo no Explorer ou use a busca rapida.</p>
               <ul class="editor-welcome-shortcuts">
@@ -129,7 +146,11 @@
     <!-- AI Panel -->
     <aside class="ai-panel" id="ai-panel">
       <header class="ai-panel-header">
-        <span class="ai-panel-title">Nexus AI</span>
+        <div class="ai-panel-brand">
+          <span class="ai-panel-logo-sm" aria-hidden="true">N</span>
+          <span class="ai-panel-title">Nexus AI</span>
+          <span class="header-badge">DevMind</span>
+        </div>
         <button type="button" class="icon-btn" id="btn-toggle-ai" title="Recolher painel"><i class="codicon codicon-chevron-right"></i></button>
       </header>
       <div class="ai-panel-tools">
@@ -186,7 +207,11 @@
               <div class="patch-review-layout" id="patch-review-layout" style="display:none">
                 <div class="patch-review-header" id="patch-review-header"></div>
                 <div class="patch-files" id="patch-review-files"></div>
-                <div class="monaco-diff-shell">
+                <div class="patch-diff-toolbar" id="patch-diff-toolbar">
+  <span class="patch-diff-toolbar-title">Prévia do diff</span>
+  <span class="patch-diff-toolbar-hint">Esquerda = antes · Direita = depois — só grava no disco ao clicar em Aplicar patch</span>
+</div>
+<div class="monaco-diff-shell">
                   <div id="monaco-diff-editor"></div>
                 </div>
                 <div id="patch-stale-alert" class="patch-stale-alert" style="display:none"></div>
@@ -204,6 +229,10 @@
         <span class="status-item" id="status-project">Projeto: —</span>
       </div>
       <div class="status-right">
+        <span class="status-pill" id="status-provider-pill" title="Provider de IA">
+          <span class="status-dot"></span>
+          <span id="status-provider-label">IA: —</span>
+        </span>
         <span class="status-item" id="status-cursor">Ln 1, Col 1</span>
         <span class="status-item" id="status-terminal">Terminal</span>
         <span class="status-item" id="status-msg">Pronto</span>

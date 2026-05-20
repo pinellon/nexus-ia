@@ -73,14 +73,29 @@
     </div>`;
   }
 
-  function renderPatchRow(patchIds) {
+  function renderPatchRow(patchIds, paths) {
     if (!patchIds?.length) return "";
-    return `<div class="dm-patch-notice">
-      <span>📋 ${patchIds.length} patch(es) pronto(s) para revisão</span>
-      <button class="dm-btn dm-btn-accent" data-dm-action="open_patches" data-dm-type="view" data-dm-value="patches">
-        Ver patches →
-      </button>
+    const count = patchIds.length;
+    const firstId = esc(patchIds[0]);
+    const pathHint = paths?.length ? esc(paths[0]) : "arquivo do projeto";
+    const more = paths?.length > 1 ? ` (+${paths.length - 1})` : "";
+    return `<div class="dm-patch-banner" role="alert">
+      <span class="dm-patch-banner-icon" aria-hidden="true">!</span>
+      <div class="dm-patch-banner-body">
+        <strong>${count} patch${count > 1 ? "es" : ""} pronto${count > 1 ? "s" : ""} — revisar e aplicar</strong>
+        <p>O Nexus gerou codigo em <code>${pathHint}</code>${more}. Abra <strong>Patch Review</strong> (painel inferior) para ver a prévia antes/depois — nada vai para o disco até você aplicar.</p>
+      </div>
+      <div class="dm-patch-banner-actions">
+        <button type="button" class="dm-btn dm-btn-accent" data-dm-action="open_patches" data-dm-type="view" data-dm-value="patches" data-dm-patch-id="${firstId}">Abrir Patch Review</button>
+        <button type="button" class="dm-btn dm-btn-ghost" data-dm-action="view_patch_diff" data-dm-type="view" data-dm-value="patches" data-dm-patch-id="${firstId}">Ver prévia do diff</button>
+      </div>
     </div>`;
+  }
+
+  function renderPendingPatchSticky() {
+    const last = [...state.history].reverse().find((m) => m.role === "assistant" && m.patchIds?.length);
+    if (!last?.patchIds?.length) return "";
+    return renderPatchRow(last.patchIds, last.patchPaths);
   }
 
   function renderTechDetails(data) {
@@ -156,15 +171,19 @@
       const roleLabel = msg.role === "user" ? "Você" : "Nexus";
       const extra = [];
       if (msg.progress) extra.push(renderProgress(msg.progress));
-      if (msg.patchIds) extra.push(renderPatchRow(msg.patchIds));
+      if (msg.patchIds) extra.push(renderPatchRow(msg.patchIds, msg.patchPaths));
       if (msg.confirmDecision) extra.push(renderConfirmBox(msg.confirmDecision));
       if (msg.techData)  extra.push(renderTechDetails(msg.techData));
       if (msg.planProposal) extra.push(renderPlanBox(msg.planProposal));
 
+      const avatar = msg.role === "user" ? "U" : "N";
       return `<article class="dm-msg dm-msg-${esc(msg.role)}">
-        <div class="dm-msg-role">${roleLabel}</div>
-        <div class="dm-msg-body">${md(msg.content)}</div>
-        ${extra.join("")}
+        <div class="dm-avatar ${esc(msg.role)}">${avatar}</div>
+        <div class="dm-msg-wrap">
+          <div class="dm-msg-role">${roleLabel}</div>
+          <div class="dm-msg-body">${md(msg.content)}</div>
+          ${extra.join("")}
+        </div>
       </article>`;
     }).join("");
 
@@ -179,10 +198,13 @@
     // Bind inline patch/action buttons
     body.querySelectorAll("[data-dm-action]").forEach(node => {
       node.addEventListener("click", () => {
+        const patchId = node.getAttribute("data-dm-patch-id");
         dispatch("devmind:action", {
           id:    node.getAttribute("data-dm-action"),
           type:  node.getAttribute("data-dm-type"),
-          value: node.getAttribute("data-dm-value")
+          value: node.getAttribute("data-dm-value"),
+          patchId: patchId || undefined,
+          openDiff: node.getAttribute("data-dm-action") === "view_patch_diff"
         });
       });
     });
@@ -388,6 +410,13 @@
 .dm-spinner { width:12px; height:12px; border:2px solid var(--line); border-top-color:var(--accent);
   border-radius:50%; animation:dm-spin .7s linear infinite; }
 @keyframes dm-spin { to{transform:rotate(360deg)} }
+.dm-patch-banner{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:10px 14px 14px;padding:12px 14px;border:1px solid rgba(245,158,11,.45);border-radius:10px;background:rgba(245,158,11,.12)}
+.dm-patch-banner-icon{width:28px;height:28px;border-radius:8px;background:#f59e0b;color:#000;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.dm-patch-banner-body{flex:1;min-width:180px}
+.dm-patch-banner-body strong{display:block;font-size:13px;color:#eae8e0;margin-bottom:4px}
+.dm-patch-banner-body p{margin:0;font-size:12px;color:#9e9c96;line-height:1.45}
+.dm-patch-banner-body code{font-family:var(--mono);font-size:11px;color:#f59e0b}
+.dm-patch-banner-actions{display:flex;gap:8px;flex-shrink:0}
 .dm-patch-notice { display:flex; align-items:center; justify-content:space-between; gap:10px;
   margin-top:8px; padding:9px 11px; border:1px solid rgba(86,214,201,.3); border-radius:6px;
   background:#0d201f; font-size:13px; }
