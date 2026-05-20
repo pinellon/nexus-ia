@@ -7,12 +7,15 @@ Nexus IA e uma IDE web local com assistente de programacao por IA. A proposta e 
 Esta versao fecha o primeiro ciclo usavel do produto:
 
 - IDE web local em Node.js e Express.
+- Tema escuro estilo VS Code (activity bar, sidebar, editor, painel inferior, status bar).
 - Monaco Editor com Explorer, abas, edicao manual e `Ctrl+S`.
 - Nexus AI lateral para conversar sobre o projeto ativo.
-- Patch Review visual com Monaco Diff.
+- Patch Review visual com Monaco Diff (antes/depois lado a lado).
+- Aplicacao de mudancas somente com aprovacao do usuario.
 - Progresso em tempo real dos agentes via SSE.
 - Comandos controlados para build, typecheck, testes e Git basico.
 - Seguranca basica para arquivos sensiveis, path traversal e comandos perigosos.
+- Rate limit em rotas sensiveis de IA e agentes.
 - Testes automatizados com Vitest, Supertest, typecheck, build e CI.
 
 O foco da v1 MVP e o fluxo principal:
