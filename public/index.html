@@ -183,9 +183,20 @@
           <button type="button" class="icon-btn" id="btn-clear-terminal" title="Limpar"><i class="codicon codicon-clear-all"></i></button>
           <button type="button" class="icon-btn" id="btn-run-typecheck"><i class="codicon codicon-check"></i> typecheck</button>
           <button type="button" class="icon-btn" id="btn-run-build"><i class="codicon codicon-package"></i> build</button>
+          <button type="button" class="icon-btn" id="btn-run-test"><i class="codicon codicon-beaker"></i> test</button>
+          <button type="button" class="icon-btn" id="btn-run-git-status"><i class="codicon codicon-source-control"></i> git status</button>
+          <button type="button" class="icon-btn" id="btn-run-git-diff"><i class="codicon codicon-diff"></i> git diff</button>
         </div>
         <div class="panel-view active" id="panel-terminal">
           <div class="terminal-body" id="terminal-output">Aguardando comandos...</div>
+          <form class="terminal-input-row" id="terminal-form" autocomplete="off">
+            <span class="terminal-prompt">&gt;</span>
+            <input id="terminal-command-input" class="terminal-command-input" type="text" spellcheck="false" placeholder="Digite comando permitido: npm run build, npm run typecheck, npm test, git status, git diff">
+            <button type="submit" class="btn-primary btn-sm" id="btn-terminal-run">Executar</button>
+          </form>
+          <div class="terminal-help">
+            Permitidos: <code>npm run build</code>, <code>npm run typecheck</code>, <code>npm test</code>, <code>git status</code>, <code>git diff</code>, <code>node --version</code>, <code>npm --version</code>.
+          </div>
         </div>
         <div class="panel-view" id="panel-output">
           <div class="output-body" id="output-body"></div>

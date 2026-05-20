@@ -629,6 +629,53 @@ body {
   gap: 10px;
 }
 
+.terminal-input-row {
+  border-top: 1px solid var(--border-nx2);
+  background: var(--bg1);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 9px 10px;
+}
+
+.terminal-prompt {
+  color: var(--amber);
+  font-family: var(--font-mono);
+  font-weight: 700;
+}
+
+.terminal-command-input {
+  min-width: 0;
+  border: 1px solid var(--border-nx2);
+  border-radius: var(--radius);
+  background: var(--bg2);
+  color: var(--text-1);
+  padding: 8px 10px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  outline: none;
+}
+
+.terminal-command-input:focus {
+  border-color: var(--amber-dim);
+  box-shadow: 0 0 0 2px var(--amber-glow);
+}
+
+.terminal-help {
+  border-top: 1px solid var(--border-nx2);
+  color: var(--text-3);
+  font-size: 11px;
+  line-height: 1.5;
+  padding: 7px 10px;
+  background: var(--bg2);
+}
+
+.terminal-help code {
+  color: var(--amber);
+  font-family: var(--font-mono);
+}
+
 .problem-title {
   color: var(--amber);
   font-weight: 700;

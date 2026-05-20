@@ -14,8 +14,47 @@ function logTerminal(msg) {
 const COMMAND_LABELS = {
   build: "npm run build",
   typecheck: "npm run typecheck",
-  test: "npm test"
+  test: "npm test",
+  "git-status": "git status",
+  "git-diff": "git diff",
+  "node-version": "node --version",
+  "npm-version": "npm --version"
 };
+
+const TERMINAL_HISTORY_KEY = "nexus-terminal-history";
+
+function loadTerminalHistory() {
+  try {
+    return JSON.parse(localStorage.getItem(TERMINAL_HISTORY_KEY) || "[]").filter(Boolean).slice(-30);
+  } catch {
+    return [];
+  }
+}
+
+function saveTerminalHistory(history) {
+  localStorage.setItem(TERMINAL_HISTORY_KEY, JSON.stringify(history.slice(-30)));
+}
+
+function normalizeCommandResult(result, fallbackCommand) {
+  return {
+    command: result.command || fallbackCommand,
+    stdout: result.stdout || "",
+    stderr: result.stderr || "",
+    exit_code: result.exit_code ?? result.exitCode ?? 1,
+    duration_ms: result.duration_ms ?? result.durationMs ?? 0,
+    created_at: result.created_at || new Date().toISOString()
+  };
+}
+
+function setTerminalRunning(running) {
+  const input = $("#terminal-command-input");
+  const run = $("#btn-terminal-run");
+  if (input) input.disabled = running;
+  if (run) {
+    run.disabled = running;
+    run.textContent = running ? "Executando..." : "Executar";
+  }
+}
 
 function clearTerminal() {
   const out = $("#terminal-output");
@@ -44,9 +83,10 @@ function renderProblemsFromCommand(result) {
   $("#btn-fix-last-command")?.addEventListener("click", () => fixLastCommandWithNexus());
 }
 
-async function runDevCommand(commandId) {
-  const command = COMMAND_LABELS[commandId] || commandId;
+async function runDevCommand(commandIdOrCommand) {
+  const command = COMMAND_LABELS[commandIdOrCommand] || commandIdOrCommand;
   showBottomPanel("terminal");
+  setTerminalRunning(true);
   logTerminal(`>> ${command}`);
   setStatus(`Executando ${command}...`);
   try {
@@ -55,7 +95,7 @@ async function runDevCommand(commandId) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ command })
     });
-    const result = res.data || res;
+    const result = normalizeCommandResult(res.data || res, command);
     state.lastCommandResult = result;
     logTerminal(result.stdout || "");
     logTerminal(result.stderr || "");
@@ -82,6 +122,10 @@ async function runDevCommand(commandId) {
     renderProblemsFromCommand(failed);
     showBottomPanel("problems");
     return failed;
+  } finally {
+    setTerminalRunning(false);
+    const input = $("#terminal-command-input");
+    if (input) input.focus();
   }
 }
 
@@ -124,6 +168,9 @@ function toggleBottomPanel() {
 }
 
 function initTerminal() {
+  state.terminalHistory = loadTerminalHistory();
+  state.terminalHistoryIndex = state.terminalHistory.length;
+
   $all(".panel-tab").forEach((tab) => {
     tab.addEventListener("click", () => showBottomPanel(tab.dataset.panel));
   });
@@ -132,6 +179,36 @@ function initTerminal() {
   $("#btn-clear-terminal")?.addEventListener("click", clearTerminal);
   $("#btn-run-typecheck")?.addEventListener("click", () => runDevCommand("typecheck"));
   $("#btn-run-build")?.addEventListener("click", () => runDevCommand("build"));
+  $("#btn-run-test")?.addEventListener("click", () => runDevCommand("test"));
+  $("#btn-run-git-status")?.addEventListener("click", () => runDevCommand("git-status"));
+  $("#btn-run-git-diff")?.addEventListener("click", () => runDevCommand("git-diff"));
+
+  $("#terminal-form")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const input = $("#terminal-command-input");
+    const command = input?.value?.trim();
+    if (!command) return;
+    state.terminalHistory = [...(state.terminalHistory || []).filter((item) => item !== command), command].slice(-30);
+    state.terminalHistoryIndex = state.terminalHistory.length;
+    saveTerminalHistory(state.terminalHistory);
+    input.value = "";
+    runDevCommand(command);
+  });
+
+  $("#terminal-command-input")?.addEventListener("keydown", (event) => {
+    if (!state.terminalHistory?.length) return;
+    const input = event.currentTarget;
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      state.terminalHistoryIndex = Math.max(0, (state.terminalHistoryIndex ?? state.terminalHistory.length) - 1);
+      input.value = state.terminalHistory[state.terminalHistoryIndex] || "";
+    }
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      state.terminalHistoryIndex = Math.min(state.terminalHistory.length, (state.terminalHistoryIndex ?? state.terminalHistory.length) + 1);
+      input.value = state.terminalHistory[state.terminalHistoryIndex] || "";
+    }
+  });
 
   window.toggleTerminal = () => {
     if (state.layout.bottomCollapsed) {
