@@ -4,8 +4,16 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { registerAgentRoutes } from "./app/web/server.js";
+import {
+  assertPatchActionInsideActiveProject,
+  ensureActiveProject,
+  getActiveProject,
+  getAppRoot,
+  resolveProjectRootForRequest,
+  setActiveProjectRoot
+} from "./active-project.js";
 import { selectOrchestrationMode } from "./orchestration-mode.js";
-import { getProviderStatus, loadAISettings, maskApiKey, saveAISettings } from "./app/ai/ai-settings.js";
+import { getProviderStatus, loadAISettings, maskApiKey, saveAISettings, type ProviderName } from "./app/ai/ai-settings.js";
 import { applyAction } from "./action-executor.js";
 import { extractProposedActions } from "./action-planner.js";
 import type { ActionRecord } from "./action-types.js";
@@ -187,6 +195,33 @@ function parsePromptBody(req: express.Request) {
   };
 }
 
+async function activeProjectInput() {
+  return (await ensureActiveProject()).root;
+}
+
+async function activeProjectAbsoluteRoot() {
+  return (await ensureActiveProject()).absoluteRoot;
+}
+
+function readRequestedProjectRoot(value: unknown) {
+  return resolveProjectRootForRequest(value);
+}
+
+function assertSafePatchApply(action: ActionRecord) {
+  if (isPatchAction(action)) {
+    assertPatchActionInsideActiveProject(action);
+  }
+}
+
+function isSafePatchForActiveProject(action: ActionRecord) {
+  try {
+    assertSafePatchApply(action);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function executeProjectCommand(commandLike: string, root = projectRoot) {
   const resolved = resolveAllowedCommand(commandLike);
   if (!resolved) {
@@ -205,28 +240,62 @@ async function executeProjectCommand(commandLike: string, root = projectRoot) {
 }
 
 app.get("/api/health", async (_req, res) => {
-  const project = readProjectSnapshot(".");
+  const activeProject = await ensureActiveProject();
+  const project = readProjectSnapshot(activeProject.root);
   res.json({
     ok: true,
     mode: process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY ? "live-ready" : "mock-ready",
     agents: getAgentStatus(),
     allowedCommands: listAllowedCommands(),
     workspaceRoot: getWorkspaceRoot(),
+    appRoot: getAppRoot(),
     projectRoot,
+    activeProject,
     project,
-    lastTestResult: await readLastCommandResult(".")
+    lastTestResult: await readLastCommandResult(activeProject.root)
   });
 });
 
 registerAgentRoutes(app);
 
-app.get("/api/project", async (_req, res) => {
+app.get("/api/project/current", async (_req, res) => {
   try {
     return res.json({
       ok: true,
+      project: await ensureActiveProject()
+    });
+  } catch (error) {
+    return res.status(500).json({
+      ok: false,
+      error: error instanceof Error ? error.message : "Falha ao carregar projeto ativo"
+    });
+  }
+});
+
+app.post("/api/project/current", generalWriteRateLimiter, async (req, res) => {
+  try {
+    const project = await setActiveProjectRoot((req.body as { root?: unknown }).root);
+    return res.json({
+      ok: true,
+      project
+    });
+  } catch (error) {
+    return res.status(400).json({
+      ok: false,
+      error: error instanceof Error ? error.message : "Falha ao selecionar projeto ativo"
+    });
+  }
+});
+
+app.get("/api/project", async (_req, res) => {
+  try {
+    const activeProject = await ensureActiveProject();
+    return res.json({
+      ok: true,
       data: {
-        ...(readProjectSnapshot(".")),
-        last_test_result: await readLastCommandResult(".")
+        ...(readProjectSnapshot(activeProject.root)),
+        activeProject,
+        last_test_result: await readLastCommandResult(activeProject.root)
       }
     });
   } catch (error) {
@@ -239,11 +308,13 @@ app.get("/api/project", async (_req, res) => {
 
 app.get("/api/project/scan", async (_req, res) => {
   try {
+    const activeProject = await ensureActiveProject();
     return res.json({
       ok: true,
       data: {
-        ...(await scanProject(".")),
-        last_test_result: await readLastCommandResult(".")
+        ...(await scanProject(activeProject.root)),
+        activeProject,
+        last_test_result: await readLastCommandResult(activeProject.root)
       }
     });
   } catch (error) {
@@ -255,9 +326,8 @@ app.get("/api/project/scan", async (_req, res) => {
 });
 
 app.get("/api/project/files", async (req, res) => {
-  const targetRoot = String(req.query.projectRoot ?? ".");
-
   try {
+    const targetRoot = readRequestedProjectRoot(req.query.projectRoot);
     return res.json({
       ok: true,
       files: await listProjectFiles(targetRoot)
@@ -271,9 +341,8 @@ app.get("/api/project/files", async (req, res) => {
 });
 
 app.get("/api/project/tree", async (req, res) => {
-  const targetRoot = String(req.query.projectRoot ?? ".");
-
   try {
+    const targetRoot = readRequestedProjectRoot(req.query.projectRoot);
     const tree = await listProjectTree(targetRoot);
     return res.json({
       ok: true,
@@ -289,13 +358,13 @@ app.get("/api/project/tree", async (req, res) => {
 });
 
 app.get("/api/project/file", async (req, res) => {
-  const targetRoot = String(req.query.projectRoot ?? ".");
   const targetPath = String(req.query.path ?? req.query.filePath ?? "");
   if (!targetPath.trim()) {
     return res.status(400).json({ ok: false, error: "path e obrigatorio" });
   }
 
   try {
+    const targetRoot = readRequestedProjectRoot(req.query.projectRoot);
     const file = await readProjectFile(targetRoot, targetPath);
     return res.json({
       ok: true,
@@ -313,7 +382,7 @@ app.get("/api/project/file", async (req, res) => {
 
 app.post("/api/project/file", generalWriteRateLimiter, async (req, res) => {
   const {
-    projectRoot: targetRoot = ".",
+    projectRoot,
     path: targetPath,
     content = ""
   } = req.body as { projectRoot?: string; path?: string; content?: string };
@@ -322,6 +391,7 @@ app.post("/api/project/file", generalWriteRateLimiter, async (req, res) => {
   }
 
   try {
+    const targetRoot = readRequestedProjectRoot(projectRoot);
     if (await projectFileExists(targetRoot, targetPath)) {
       return res.status(409).json({ ok: false, error: "Arquivo ja existe" });
     }
@@ -342,7 +412,7 @@ app.post("/api/project/file", generalWriteRateLimiter, async (req, res) => {
 
 app.put("/api/project/file", generalWriteRateLimiter, async (req, res) => {
   const {
-    projectRoot: targetRoot = ".",
+    projectRoot,
     path: targetPath,
     content = ""
   } = req.body as { projectRoot?: string; path?: string; content?: string };
@@ -351,6 +421,7 @@ app.put("/api/project/file", generalWriteRateLimiter, async (req, res) => {
   }
 
   try {
+    const targetRoot = readRequestedProjectRoot(projectRoot);
     const file = await writeProjectFile(targetRoot, targetPath, content);
     return res.json({
       ok: true,
@@ -367,13 +438,13 @@ app.put("/api/project/file", generalWriteRateLimiter, async (req, res) => {
 });
 
 app.delete("/api/project/file", async (req, res) => {
-  const targetRoot = String(req.query.projectRoot ?? ".");
   const targetPath = String(req.query.path ?? req.query.filePath ?? "");
   if (!targetPath.trim()) {
     return res.status(400).json({ ok: false, error: "path e obrigatorio" });
   }
 
   try {
+    const targetRoot = readRequestedProjectRoot(req.query.projectRoot);
     return res.json({
       ok: true,
       data: await deleteProjectFile(targetRoot, targetPath)
@@ -388,7 +459,7 @@ app.delete("/api/project/file", async (req, res) => {
 
 app.post("/api/project/folder", async (req, res) => {
   const {
-    projectRoot: targetRoot = ".",
+    projectRoot,
     path: targetPath
   } = req.body as { projectRoot?: string; path?: string };
   if (!targetPath?.trim()) {
@@ -396,6 +467,7 @@ app.post("/api/project/folder", async (req, res) => {
   }
 
   try {
+    const targetRoot = readRequestedProjectRoot(projectRoot);
     return res.status(201).json({
       ok: true,
       data: await createProjectFolder(targetRoot, targetPath)
@@ -410,7 +482,7 @@ app.post("/api/project/folder", async (req, res) => {
 
 app.put("/api/project/rename", async (req, res) => {
   const {
-    projectRoot: targetRoot = ".",
+    projectRoot,
     oldPath,
     newPath
   } = req.body as { projectRoot?: string; oldPath?: string; newPath?: string };
@@ -419,6 +491,7 @@ app.put("/api/project/rename", async (req, res) => {
   }
 
   try {
+    const targetRoot = readRequestedProjectRoot(projectRoot);
     return res.json({
       ok: true,
       data: await renameProjectPath(targetRoot, oldPath, newPath)
@@ -432,7 +505,6 @@ app.put("/api/project/rename", async (req, res) => {
 });
 
 app.delete("/api/project/folder", async (req, res) => {
-  const targetRoot = String(req.query.projectRoot ?? ".");
   const targetPath = String(req.query.path ?? "");
   const confirmed = String(req.query.confirm ?? "");
   if (!targetPath.trim()) {
@@ -446,6 +518,7 @@ app.delete("/api/project/folder", async (req, res) => {
   }
 
   try {
+    const targetRoot = readRequestedProjectRoot(req.query.projectRoot);
     return res.json({
       ok: true,
       data: await deleteProjectFolder(targetRoot, targetPath)
@@ -458,11 +531,12 @@ app.delete("/api/project/folder", async (req, res) => {
   }
 });
 
-app.get("/api/project/git/status", (_req, res) => {
+app.get("/api/project/git/status", async (_req, res) => {
   try {
+    const root = await activeProjectInput();
     return res.json({
       ok: true,
-      data: getGitStatus(".")
+      data: getGitStatus(root)
     });
   } catch (error) {
     return res.status(500).json({
@@ -475,7 +549,7 @@ app.get("/api/project/git/status", (_req, res) => {
 app.post("/api/project/run-command", commandRateLimiter, async (req, res) => {
   try {
     const { command, commandId } = req.body as { command?: string; commandId?: string };
-    const result = await executeProjectCommand(command || commandId || "", projectRoot);
+    const result = await executeProjectCommand(command || commandId || "", await activeProjectAbsoluteRoot());
     return res.json({ ok: true, data: result });
   } catch (error) {
     return res.status(400).json({
@@ -683,6 +757,10 @@ app.post("/api/actions/:id/reject", async (req, res) => {
 
 app.post("/api/actions/:id/apply", async (req, res) => {
   try {
+    const action = await getPendingAction(req.params.id);
+    if (action) {
+      assertSafePatchApply(action);
+    }
     const applied = await applyAction(req.params.id);
     await writeActionHistory(applied.action.sessionId, "Acao aplicada com confirmacao", applied.action);
     return res.json(applied);
@@ -696,7 +774,9 @@ app.post("/api/actions/:id/apply", async (req, res) => {
 
 app.get("/api/patches", async (_req, res) => {
   try {
-    const pending = (await listPendingActions()).filter(isPatchAction);
+    const pending = (await listPendingActions()).filter(
+      (action) => isPatchAction(action) && isSafePatchForActiveProject(action)
+    );
     const actions = await Promise.all(pending.map((action) => buildPatchPayload(action)));
     return res.json({
       ok: true,
@@ -713,7 +793,10 @@ app.get("/api/patches", async (_req, res) => {
 app.get("/api/patches/pending", async (_req, res) => {
   try {
     const pending = (await listPendingActions()).filter(
-      (action) => isPatchAction(action) && (action.status === "pending" || action.status === "approved")
+      (action) =>
+        isPatchAction(action) &&
+        isSafePatchForActiveProject(action) &&
+        (action.status === "pending" || action.status === "approved")
     );
     const patches = await Promise.all(pending.map((action) => buildPatchPayload(action)));
     return res.json({
@@ -761,6 +844,8 @@ app.post("/api/patches/pending/:patchId/apply", async (req, res) => {
     if (!action || !isPatchAction(action)) {
       return res.status(404).json({ ok: false, error: "patch nao encontrado" });
     }
+
+    assertSafePatchApply(action);
 
     if (action.status === "pending") {
       await approveAction(action.id);
@@ -810,6 +895,8 @@ app.get("/api/patches/:patchId", async (req, res) => {
       return res.status(404).json({ ok: false, error: "patch nao encontrado" });
     }
 
+    assertSafePatchApply(action);
+
     const patch = await buildPatchPayload(action);
     return res.json({
       ok: true,
@@ -817,7 +904,7 @@ app.get("/api/patches/:patchId", async (req, res) => {
       data: patch
     });
   } catch (error) {
-    return res.status(500).json({
+    return res.status(400).json({
       ok: false,
       error: error instanceof Error ? error.message : "Falha ao carregar patch"
     });
@@ -830,6 +917,8 @@ app.post("/api/patches/:patchId/apply", async (req, res) => {
     if (!action || !isPatchAction(action)) {
       return res.status(404).json({ ok: false, error: "patch nao encontrado" });
     }
+
+    assertSafePatchApply(action);
 
     if (action.status === "pending") {
       await approveAction(action.id);
@@ -928,6 +1017,10 @@ app.post("/api/actions/apply", async (req, res) => {
   try {
     const applied = [];
     for (const actionId of actionIds) {
+      const action = await getPendingAction(actionId);
+      if (action) {
+        assertSafePatchApply(action);
+      }
       applied.push(await applyAction(actionId));
     }
     return res.json({ applied });
@@ -1074,7 +1167,7 @@ app.post("/api/commands/run", commandRateLimiter, async (req, res) => {
   }
 
   try {
-    return res.json(await runCommand(commandId, projectRoot));
+    return res.json(await runCommand(commandId, await activeProjectAbsoluteRoot()));
   } catch (error) {
     console.error("[commands:run]", error);
     return res.status(400).json({
@@ -1086,7 +1179,7 @@ app.post("/api/commands/run", commandRateLimiter, async (req, res) => {
 app.post("/api/tests/run", commandRateLimiter, async (req, res) => {
   try {
     const { command } = req.body as { command?: string };
-    const result = await executeProjectCommand(command || "", projectRoot);
+    const result = await executeProjectCommand(command || "", await activeProjectAbsoluteRoot());
     return res.json({
       ok: true,
       command: result.command,
@@ -1104,11 +1197,60 @@ app.post("/api/tests/run", commandRateLimiter, async (req, res) => {
   }
 });
 
-app.get("/api/git/status", (_req, res) => {
+app.post("/api/dev/fix-command", aiRateLimiter, async (req, res) => {
   try {
+    const {
+      command = "",
+      stdout = "",
+      stderr = "",
+      exit_code,
+      active_file = "",
+      context = ""
+    } = req.body as {
+      command?: string;
+      stdout?: string;
+      stderr?: string;
+      exit_code?: number;
+      active_file?: string;
+      context?: string;
+    };
+
+    const goal = [
+      `Corrija o erro do comando: ${command || "validacao"}.`,
+      typeof exit_code === "number" ? `Exit code: ${exit_code}` : "",
+      active_file ? `Arquivo ativo: ${active_file}` : "",
+      stdout ? `STDOUT:\n${String(stdout).slice(0, 6_000)}` : "",
+      stderr ? `STDERR:\n${String(stderr).slice(0, 6_000)}` : "",
+      context ? `Contexto da IDE:\n${String(context).slice(0, 4_000)}` : ""
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+
+    const run = await import("./app/agents/runner.js").then(({ agentRunner }) =>
+      agentRunner.run_agent("debug_agent", goal, getActiveProject().root)
+    );
+
+    return res.status(202).json({
+      ok: true,
+      run_id: run.id,
+      agent_id: "debug_agent",
+      status: "started",
+      message: "Debug Agent iniciado com o erro do comando."
+    });
+  } catch (error) {
+    return res.status(400).json({
+      ok: false,
+      error: error instanceof Error ? error.message : "Falha ao iniciar correcao com Nexus"
+    });
+  }
+});
+
+app.get("/api/git/status", async (_req, res) => {
+  try {
+    const root = await activeProjectInput();
     return res.json({
       ok: true,
-      data: getGitStatus(".")
+      data: getGitStatus(root)
     });
   } catch (error) {
     return res.status(500).json({
@@ -1118,11 +1260,12 @@ app.get("/api/git/status", (_req, res) => {
   }
 });
 
-app.get("/api/git/diff", (_req, res) => {
+app.get("/api/git/diff", async (_req, res) => {
   try {
+    const root = await activeProjectInput();
     return res.json({
       ok: true,
-      data: getGitDiff(".")
+      data: getGitDiff(root)
     });
   } catch (error) {
     return res.status(500).json({
@@ -1132,12 +1275,13 @@ app.get("/api/git/diff", (_req, res) => {
   }
 });
 
-app.post("/api/git/commit-message", (_req, res) => {
+app.post("/api/git/commit-message", async (_req, res) => {
   try {
+    const root = await activeProjectInput();
     return res.json({
       ok: true,
       data: {
-        message: generateCommitMessage(".")
+        message: generateCommitMessage(root)
       }
     });
   } catch (error) {
@@ -1148,12 +1292,13 @@ app.post("/api/git/commit-message", (_req, res) => {
   }
 });
 
-app.post("/api/git/commit", (req, res) => {
+app.post("/api/git/commit", async (req, res) => {
   try {
     const { message } = req.body as { message?: string };
+    const root = await activeProjectInput();
     return res.json({
       ok: true,
-      data: createGitCommit(".", message || "")
+      data: createGitCommit(root, message || "")
     });
   } catch (error) {
     return res.status(400).json({
@@ -1194,8 +1339,11 @@ app.post("/api/ai/settings", async (req, res) => {
 });
 
 app.post("/api/ai/test-provider", aiRateLimiter, async (req, res) => {
-  const { provider } = req.body as { provider?: string };
-  if (!provider) return res.status(400).json({ ok: false, error: "provider é obrigatório" });
+  const provider = String(req.body?.provider ?? "").trim();
+  const allowedProviders = ["anthropic", "openai", "gemini", "groq", "openrouter", "ollama"] as const;
+  if (!allowedProviders.includes(provider as typeof allowedProviders[number])) {
+    return res.status(400).json({ ok: false, error: "provider inválido" });
+  }
 
   try {
     const { AIProviderRouter } = await import("./app/ai/provider-router.js");
@@ -1205,6 +1353,7 @@ app.post("/api/ai/test-provider", aiRateLimiter, async (req, res) => {
       context: "",
       goal: "Responda apenas: ok",
       allowPremium: true,
+      forceProvider: provider as ProviderName,
       forceLocal: provider === "ollama"
     });
     return res.json({
@@ -1255,10 +1404,51 @@ app.use((_req, res) => {
   res.sendFile(path.join(publicDir, "index.html"));
 });
 
+// Error handling middleware
+app.use((err: unknown, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error("[Unhandled Server Error]", err);
+  res.status(500).json({
+    ok: false,
+    error: err instanceof Error ? err.message : "Erro interno do servidor"
+  });
+});
+
 export { app };
+
+async function validateAnthropicModel() {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const model = process.env.ANTHROPIC_MODEL || "claude-sonnet-4-6";
+  if (!apiKey) return;
+
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/models", {
+      headers: {
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01"
+      }
+    });
+    if (!res.ok) {
+      console.warn(`[Startup] Alerta: Não foi possível validar o modelo Anthropic. API retornou status ${res.status}`);
+      return;
+    }
+    const data = await res.json() as { data?: Array<{ id: string }> };
+    const models = data.data || [];
+    const exists = models.some(m => m.id === model);
+    if (!exists) {
+      console.warn(`[Startup] AVISO: O modelo Anthropic configurado "${model}" não foi encontrado na lista de modelos disponíveis na API.`);
+    } else {
+      console.log(`[Startup] Modelo Anthropic "${model}" validado com sucesso.`);
+    }
+  } catch (err) {
+    console.warn("[Startup] Alerta: Falha ao validar modelo Anthropic na API:", err instanceof Error ? err.message : err);
+  }
+}
 
 if (process.env.NODE_ENV !== "test" && !process.env.VITEST) {
   app.listen(port, () => {
     console.log(`Nexus IDE rodando em http://localhost:${port}`);
+    validateAnthropicModel().catch((err) => {
+      console.warn("[Startup] Falha silenciosa na inicializacao da validacao:", err);
+    });
   });
 }

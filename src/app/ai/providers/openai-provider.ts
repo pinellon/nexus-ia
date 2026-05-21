@@ -1,15 +1,21 @@
 import type { AIMessage, AIProviderResponse } from "./ollama-provider.js";
 
-interface OpenAIResponsesPayload {
-  output_text?: string;
+interface ChatCompletionPayload {
+  choices?: Array<{ message?: { content?: string } }>;
   usage?: {
-    input_tokens?: number;
-    output_tokens?: number;
+    prompt_tokens?: number;
+    completion_tokens?: number;
   };
+  error?: { message?: string };
 }
 
 function estimateTokens(value: string) {
   return Math.max(1, Math.ceil(value.length / 4));
+}
+
+async function readErrorSnippet(response: Response) {
+  const text = await response.text().catch(() => "");
+  return text.slice(0, 220);
 }
 
 export class OpenAIProvider {
@@ -19,7 +25,7 @@ export class OpenAIProvider {
 
   constructor(config?: { apiKey?: string; model?: string }) {
     this.apiKey = config?.apiKey || process.env.OPENAI_API_KEY;
-    this.model = config?.model || process.env.OPENAI_MODEL || "gpt-4.1";
+    this.model = config?.model || process.env.OPENAI_MODEL || "gpt-4o-mini";
   }
 
   isConfigured() {
@@ -31,7 +37,7 @@ export class OpenAIProvider {
       throw new Error("OPENAI_API_KEY nao configurada");
     }
 
-    const response = await fetch("https://api.openai.com/v1/responses", {
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -39,26 +45,31 @@ export class OpenAIProvider {
       },
       body: JSON.stringify({
         model: this.model,
-        input: messages.map((message) => ({
-          role: message.role === "system" ? "developer" : message.role,
+        messages: messages.map((message) => ({
+          role: message.role,
           content: message.content
         }))
       })
     });
 
     if (!response.ok) {
-      throw new Error(`OpenAI retornou ${response.status}`);
+      const detail = await readErrorSnippet(response);
+      throw new Error(`OpenAI retornou ${response.status}${detail ? `: ${detail}` : ""}`);
     }
 
-    const data = (await response.json()) as OpenAIResponsesPayload;
-    const content = data.output_text || "";
+    const data = (await response.json()) as ChatCompletionPayload;
+    const content = data.choices?.[0]?.message?.content?.trim() || "";
+
+    if (!content) {
+      throw new Error("OpenAI retornou resposta vazia. Verifique o modelo em Configuracoes > IA.");
+    }
 
     return {
       provider: this.provider,
       model: this.model,
       content,
-      inputTokens: data.usage?.input_tokens ?? estimateTokens(messages.map((message) => message.content).join("\n")),
-      outputTokens: data.usage?.output_tokens ?? estimateTokens(content)
+      inputTokens: data.usage?.prompt_tokens ?? estimateTokens(messages.map((m) => m.content).join("\n")),
+      outputTokens: data.usage?.completion_tokens ?? estimateTokens(content)
     };
   }
 }

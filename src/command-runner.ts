@@ -1,5 +1,7 @@
 import { spawn } from "node:child_process";
 
+import { getRepositoryRoot } from "./project-file-store.js";
+
 const MAX_LOG_SIZE = 20_000;
 const COMMAND_TIMEOUT_MS = 30_000;
 const SAFE_PACKAGE_NAME = /^(?:@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/i;
@@ -11,7 +13,9 @@ const COMMANDS = {
   install: { label: "npm install", command: "npm", args: ["install"] },
   "install-dev": { label: "npm install --save-dev", command: "npm", args: ["install", "--save-dev"] },
   "node-version": { label: "node --version", command: "node", args: ["--version"] },
-  "npm-version": { label: "npm --version", command: "npm", args: ["--version"] }
+  "npm-version": { label: "npm --version", command: "npm", args: ["--version"] },
+  "git-status": { label: "git status", command: "git", args: ["status", "--short", "--branch"] },
+  "git-diff": { label: "git diff", command: "git", args: ["diff", "--no-ext-diff"] }
 } as const;
 
 export type AllowedCommandId = keyof typeof COMMANDS;
@@ -47,10 +51,18 @@ function executeProcess(command: string, args: string[], cwd: string, id: Comman
   const isWindowsNpm = process.platform === "win32" && command === "npm";
   const executable = isWindowsNpm ? "cmd.exe" : command;
   const finalArgs = isWindowsNpm ? ["/d", "/s", "/c", "npm", ...args] : args;
+  const env =
+    command === "git"
+      ? {
+          ...process.env,
+          GIT_CEILING_DIRECTORIES: getRepositoryRoot()
+        }
+      : process.env;
 
   return new Promise<CommandRunResult>((resolve, reject) => {
     const child = spawn(executable, finalArgs, {
       cwd,
+      env,
       shell: false,
       windowsHide: true
     });

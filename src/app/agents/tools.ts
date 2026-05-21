@@ -3,6 +3,7 @@ import { spawn } from "node:child_process";
 
 import { createPendingAction } from "../../pending-actions-store.js";
 import {
+  getRepositoryRoot,
   listProjectFiles,
   listProjectTree,
   readProjectFile,
@@ -86,6 +87,13 @@ async function runCommand(projectRoot: string, label: string) {
   return new Promise<CommandOutcome>((resolve, reject) => {
     const child = spawn(executable, finalArgs, {
       cwd: projectRoot,
+      env:
+        selected.command === "git"
+          ? {
+              ...process.env,
+              GIT_CEILING_DIRECTORIES: getRepositoryRoot()
+            }
+          : process.env,
       shell: false,
       windowsHide: true
     });
@@ -454,7 +462,7 @@ ${packageSummary}
     toolName: "generate_readme",
     summary: "Rascunho de README gerado",
     data: {
-      readmePath: "README.md",
+      readmePath: "docs/drafts/readme-draft.md",
       content: draft
     },
     artifactIds: [artifact.id]

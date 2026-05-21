@@ -169,6 +169,9 @@ function initKeyboardShortcuts() {
 
 function showBottomPanel(name) {
   state.layout.bottomCollapsed = false;
+  if (name === "patch" && typeof ensurePatchPanelHeight === "function") {
+    ensurePatchPanelHeight();
+  }
   applyLayoutCss();
   saveLayoutToStorage();
   $all(".panel-tab").forEach((tab) => {

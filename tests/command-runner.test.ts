@@ -6,6 +6,8 @@ describe("command-runner", () => {
   it("resolves allowed command aliases and labels", () => {
     expect(resolveAllowedCommand("npm run build")?.id).toBe("build");
     expect(resolveAllowedCommand("build")?.id).toBe("build");
+    expect(resolveAllowedCommand("git status")?.id).toBe("git-status");
+    expect(resolveAllowedCommand("git diff")?.id).toBe("git-diff");
   });
 
   it("rejects dangerous shell commands", () => {

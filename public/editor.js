@@ -104,6 +104,17 @@ async function openDocument(filePath, content, options = {}) {
   return doc;
 }
 
+function revealEditorPosition(lineNumber = 1, column = 1) {
+  if (!state.editor || !lineNumber) return;
+  const position = {
+    lineNumber: Math.max(1, Number(lineNumber) || 1),
+    column: Math.max(1, Number(column) || 1)
+  };
+  state.editor.setPosition(position);
+  state.editor.revealPositionInCenter(position);
+  state.editor.focus();
+}
+
 function setActiveDocument(filePath) {
   const doc = state.openedFiles.get(filePath);
   if (!doc || !state.editor) return;
@@ -196,7 +207,7 @@ async function saveActiveFile() {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        projectRoot: state.project?.projectPath || ".",
+        projectRoot: activeProjectRoot(),
         path: doc.path,
         content
       })
@@ -214,22 +225,24 @@ async function saveActiveFile() {
   }
 }
 
-async function openFile(filePath, stagedFile = null) {
+async function openFile(filePath, stagedFile = null, options = {}) {
   if (!state.project && !stagedFile) return;
   try {
     if (stagedFile) {
       const res = await api("/api/staged-files/" + stagedFile.id);
       const sf = res.data;
       await openDocument(filePath, sf.content, { stagedFile: sf });
+      if (options.line) revealEditorPosition(options.line, options.column);
       return;
     }
     const res = await api(
       "/api/project/file?projectRoot=" +
-        encodeURIComponent(state.project.projectPath) +
+        encodeURIComponent(activeProjectRoot()) +
         "&filePath=" +
         encodeURIComponent(filePath)
     );
     await openDocument(filePath, res.content || res.data?.content || "");
+    if (options.line) revealEditorPosition(options.line, options.column);
   } catch (e) {
     setStatus("Falha ao carregar: " + e.message);
   }

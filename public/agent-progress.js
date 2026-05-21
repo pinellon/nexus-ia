@@ -116,8 +116,13 @@ function renderAgentProgress() {
   `;
 
   $("#agent-progress-open-patches")?.addEventListener("click", () => {
-    showBottomPanel("patch");
-    if (typeof loadPatches === "function") loadPatches();
+    const patchId = state.agentProgress.patchIds?.[0];
+    if (typeof openPatchesPanel === "function") {
+      openPatchesPanel({ patchId, viewDiff: true });
+    } else {
+      showBottomPanel("patch");
+      if (typeof loadPatches === "function") loadPatches();
+    }
   });
   root.scrollTop = root.scrollHeight;
 }
@@ -138,10 +143,12 @@ function finishAgentProgress(event) {
   stopAgentProgress();
   renderAgentProgress();
 
-  if (state.agentProgress.patchIds.length && typeof loadPatches === "function") {
-    loadPatches();
-    if (event.type === "needs_approval") {
-      showBottomPanel("patch");
+  if (state.agentProgress.patchIds.length) {
+    const patchId = state.agentProgress.patchIds[0];
+    if (event.type === "needs_approval" && typeof openPatchesPanel === "function") {
+      openPatchesPanel({ patchId, viewDiff: true });
+    } else if (typeof loadPatches === "function") {
+      loadPatches();
     }
   }
 }

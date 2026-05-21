@@ -40,38 +40,79 @@ function extractMentionedPaths(text: string) {
   return Array.from(new Set(matches.map((item) => item.replace(/^\.?\//, ""))));
 }
 
-function selectImportantFiles(goal: string, availableFiles: string[]) {
-  const loweredGoal = goal.toLowerCase();
+function addIfAvailable(selected: Set<string>, availableFiles: Set<string>, candidates: string[]) {
+  for (const candidate of candidates) {
+    if (availableFiles.has(candidate)) {
+      selected.add(candidate);
+    }
+  }
+}
+
+export function selectContextFiles(goal: string, availableFilesInput: string[], extraContext = "") {
+  const availableFiles = new Set(availableFilesInput);
+  const combined = [goal, extraContext].filter(Boolean).join("\n");
+  const loweredGoal = combined.toLowerCase();
   const selected = new Set<string>();
 
-  for (const pathName of extractMentionedPaths(goal)) {
-    if (availableFiles.includes(pathName)) {
+  for (const pathName of extractMentionedPaths(combined)) {
+    if (availableFiles.has(pathName)) {
       selected.add(pathName);
     }
   }
 
-  for (const candidate of ["package.json", "tsconfig.json", "README.md"]) {
-    if (availableFiles.includes(candidate)) {
-      selected.add(candidate);
+  const activeFile = combined.match(/Arquivo ativo:\s*([^\n\r]+)/i)?.[1]?.trim();
+  if (activeFile && activeFile !== "nenhum" && availableFiles.has(activeFile)) {
+    selected.add(activeFile);
+  }
+
+  const openFiles = combined.match(/Arquivos abertos:\s*([^\n\r]+)/i)?.[1]?.trim();
+  if (openFiles && openFiles !== "nenhum") {
+    for (const filePath of openFiles.split(",").map((item) => item.trim())) {
+      if (availableFiles.has(filePath)) selected.add(filePath);
     }
   }
 
+  addIfAvailable(selected, availableFiles, ["package.json", "tsconfig.json", "README.md"]);
+
   if (/(build|typecheck|tsc|erro|falha|debug)/.test(loweredGoal)) {
-    for (const candidate of ["package.json", "tsconfig.json"]) {
-      if (availableFiles.includes(candidate)) {
-        selected.add(candidate);
-      }
-    }
+    addIfAvailable(selected, availableFiles, [
+      "package.json",
+      "tsconfig.json",
+      "vite.config.ts",
+      "vite.config.js",
+      "src/server.ts",
+      "src/app.ts",
+      "src/App.tsx",
+      "public/index.html"
+    ]);
   }
 
   if (/(tela|site|landing|home|layout|componente|ui)/.test(loweredGoal)) {
-    for (const file of availableFiles) {
+    for (const file of availableFilesInput) {
       if (/^(public\/index\.html|src\/.*\.(tsx|jsx|css|html)|public\/.*\.(html|css))$/i.test(file)) {
         selected.add(file);
       }
       if (selected.size >= 8) {
         break;
       }
+    }
+  }
+
+  if (/(api|backend|endpoint|rota|server|express|auth|login)/.test(loweredGoal)) {
+    for (const file of availableFilesInput) {
+      if (/^(src\/.*(server|route|api|controller|service|auth).*\.(ts|js)|src\/server\.ts)$/i.test(file)) {
+        selected.add(file);
+      }
+      if (selected.size >= 10) break;
+    }
+  }
+
+  if (/(readme|docs|documenta|changelog|arquitetura)/.test(loweredGoal)) {
+    for (const file of availableFilesInput) {
+      if (/^(README\.md|docs\/.*\.md)$/i.test(file)) {
+        selected.add(file);
+      }
+      if (selected.size >= 10) break;
     }
   }
 
@@ -106,20 +147,21 @@ async function readContextSummary(projectId: string, projectRoot: string) {
 }
 
 export class ContextBuilder {
-  async buildContext(input: { messages: CodeChatMessage[]; projectRoot?: string }): Promise<BuiltContext> {
+  async buildContext(input: { messages: CodeChatMessage[]; projectRoot?: string; extraContext?: string }): Promise<BuiltContext> {
     const projectRoot = input.projectRoot || ".";
     const resolved = resolveProjectRoot(projectRoot);
     const goal = latestUserMessage(input.messages);
     const files = await listProjectFiles(projectRoot);
     const availableFiles = files.map((file) => file.path);
-    const selectedFiles = selectImportantFiles(goal, availableFiles);
+    const selectedFiles = selectContextFiles(goal, availableFiles, input.extraContext);
     const { summaryPath, summary } = await readContextSummary(resolved.projectId, projectRoot);
     const parts = [
       "Contexto minimo do projeto:",
       summary,
       "",
       "Pedido atual:",
-      goal
+      goal,
+      input.extraContext ? "\nSinais atuais da IDE/terminal:\n" + input.extraContext.slice(0, 3_000) : ""
     ];
 
     for (const filePath of selectedFiles) {

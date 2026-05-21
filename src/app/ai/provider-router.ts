@@ -1,4 +1,4 @@
-import { loadAISettings, resolveProviderConfig, type AISettings, type ProviderName } from "./ai-settings.js";
+import { loadAISettings, resolveProviderConfig, hasProviderKey, type AISettings, type ProviderName } from "./ai-settings.js";
 import { AnthropicProvider } from "./providers/anthropic-provider.js";
 import { GeminiProvider } from "./providers/gemini-provider.js";
 import { GroqProvider, OpenRouterProvider } from "./providers/groq-openrouter-provider.js";
@@ -10,6 +10,15 @@ import { UsageTracker } from "./usage-tracker.js";
 export type { AIMessage };
 export type { AIProviderResponse };
 
+const PREMIUM_FALLBACK_ORDER: ProviderName[] = [
+  "openai",
+  "groq",
+  "anthropic",
+  "openrouter",
+  "gemini",
+  "ollama"
+];
+
 export type AIMode = AISettings["mode"];
 export type AIProviderName = ProviderName | "auto";
 
@@ -19,6 +28,7 @@ export interface RouteChatInput {
   goal: string;
   allowPremium?: boolean;
   forceLocal?: boolean;
+  forceProvider?: ProviderName;
 }
 
 export interface RouteChatResult {
@@ -69,8 +79,65 @@ export class AIProviderRouter {
   private readonly usage = new UsageTracker();
 
   private async getSettings() {
-    if (!this.settings) this.settings = await loadAISettings();
+    this.settings = await loadAISettings(true);
     return this.settings;
+  }
+
+  private async filterReachableOrder(order: ProviderName[]): Promise<ProviderName[]> {
+    const filtered: ProviderName[] = [];
+    let ollamaReachable: boolean | null = null;
+
+    for (const name of order) {
+      if (name !== "ollama") {
+        filtered.push(name);
+        continue;
+      }
+      if (ollamaReachable === null) {
+        const s = await this.getSettings();
+        const ollama = new OllamaProvider({
+          baseUrl: s.providers.ollama.baseUrl,
+          model: s.providers.ollama.model
+        });
+        ollamaReachable = await ollama.isReachable().catch(() => false);
+      }
+      if (ollamaReachable) filtered.push(name);
+    }
+
+    return filtered;
+  }
+
+  private configuredFallbackProviders(s: AISettings): ProviderName[] {
+    return this.sortProvidersByReliability(
+      PREMIUM_FALLBACK_ORDER.filter(
+        (name) => s.providers[name]?.enabled && hasProviderKey(s.providers[name])
+      )
+    );
+  }
+
+  private orderedCloudProviders(s: AISettings): ProviderName[] {
+    const cloud = this.configuredFallbackProviders(s);
+    const preferred = s.provider !== "auto" ? s.provider : null;
+
+    if (preferred && preferred !== "ollama" && cloud.includes(preferred)) {
+      return [preferred, ...cloud.filter((name) => name !== preferred)];
+    }
+
+    if (!preferred) {
+      return this.prioritizePremiumProvider(s, cloud);
+    }
+
+    return cloud;
+  }
+
+  private prioritizePremiumProvider(s: AISettings, providers: ProviderName[]): ProviderName[] {
+    if (!s.premiumProvider || !providers.includes(s.premiumProvider)) return providers;
+    return [s.premiumProvider, ...providers.filter((name) => name !== s.premiumProvider)];
+  }
+
+  private sortProvidersByReliability(names: ProviderName[]): ProviderName[] {
+    return [...names].sort(
+      (a, b) => PREMIUM_FALLBACK_ORDER.indexOf(a) - PREMIUM_FALLBACK_ORDER.indexOf(b)
+    );
   }
 
   async getStatus() {
@@ -102,8 +169,8 @@ export class AIProviderRouter {
     const goal = input.goal || getLatestUserMessage(input.messages);
     const taskType = classifyTask(goal);
 
-    // Build priority list based on mode
-    const order = this.buildProviderOrder(s, taskType, input);
+    // Build priority list based on mode, or force a specific provider for testing
+    const order = input.forceProvider ? [input.forceProvider] : this.buildProviderOrder(s, taskType, input);
 
     // Check if requires premium confirmation
     if (s.requirePremiumConfirmation && !input.allowPremium && !input.forceLocal) {
@@ -124,30 +191,70 @@ export class AIProviderRouter {
     }
 
     const messages = this.buildMessages(input);
-    return this.tryInOrder(order as ProviderName[], messages, taskType, s.mode);
+    let resolvedOrder = await this.filterReachableOrder(order as ProviderName[]);
+
+    if (!resolvedOrder.length) {
+      if (input.forceProvider) {
+        return {
+          ok: false, mode: s.mode, provider: "none", model: null,
+          task_type: taskType,
+          message: `Provider forçado ${input.forceProvider} não disponível.`,
+          response: "",
+          requires_premium_confirmation: false,
+          warning: "Nenhum provider disponível"
+        };
+      }
+      resolvedOrder = this.configuredFallbackProviders(s);
+    }
+
+    const result = await this.tryInOrder(resolvedOrder, messages, taskType, s.mode);
+    if (result.ok || resolvedOrder.length === 0) return result;
+
+    const emergency = this.configuredFallbackProviders(s).filter((name) => !resolvedOrder.includes(name));
+    if (!emergency.length) return result;
+
+    const retry = await this.tryInOrder(emergency, messages, taskType, s.mode);
+    if (!retry.ok) return result;
+    return {
+      ...retry,
+      usedFallback: true,
+      fallbackReason: `Providers locais indisponíveis. Usando ${retry.provider}.`
+    };
   }
 
   private buildProviderOrder(s: AISettings, task: "simple" | "medium" | "complex", input: RouteChatInput): string[] {
     if (input.forceLocal) return ["ollama"];
-    if (s.mode === "manual" && s.provider !== "auto") return [s.provider];
+    const cloudProviders = this.configuredFallbackProviders(s);
+    const preferred = s.provider !== "auto" && cloudProviders.includes(s.provider)
+      ? s.provider
+      : null;
+    if (s.mode === "manual" && preferred) return [preferred];
 
-    const premium = s.premiumProvider;
-    const localFirst = ["ollama", premium];
-    const premiumFirst = [premium, "ollama"];
-
-    // Other configured premium providers as fallback
-    const others = (["anthropic","openai","gemini","groq","openrouter"] as ProviderName[])
-      .filter(p => p !== premium && s.providers[p].enabled && s.providers[p].apiKey);
+    const cloud = this.orderedCloudProviders(s);
+    const ollamaOn = s.providers.ollama.enabled;
 
     if (s.mode === "economy") {
-      return s.allowPremiumFallback ? [...localFirst, ...others] : ["ollama"];
+      if (ollamaOn) {
+        return s.allowPremiumFallback ? ["ollama", ...cloud] : ["ollama"];
+      }
+      return s.allowPremiumFallback ? cloud : [];
     }
+
     if (s.mode === "premium") {
-      return [...premiumFirst, ...others];
+      return ollamaOn ? [...cloud, "ollama"] : cloud;
     }
-    // balanced
-    if (task === "simple") return [...localFirst, ...others];
-    return [...premiumFirst, ...others, "ollama"];
+
+    // balanced: local for simple tasks; configured provider for medium/complex
+    if (task === "simple" && ollamaOn) {
+      return ["ollama", ...cloud.filter((name) => name !== "ollama")];
+    }
+
+    if (preferred) {
+      const ordered = [preferred, ...cloud.filter((name) => name !== preferred && name !== "ollama")];
+      return ollamaOn && preferred !== "ollama" ? [preferred, "ollama", ...ordered.filter((name) => name !== preferred && name !== "ollama")] : ordered;
+    }
+
+    return ollamaOn ? [...cloud, "ollama"] : cloud;
   }
 
   private async tryInOrder(
@@ -156,7 +263,7 @@ export class AIProviderRouter {
     taskType: "simple" | "medium" | "complex",
     mode: AIMode
   ): Promise<RouteChatResult> {
-    let lastError = "";
+    const failures: string[] = [];
     for (let i = 0; i < order.length; i++) {
       const name = order[i];
       try {
@@ -180,25 +287,61 @@ export class AIProviderRouter {
           usage
         };
       } catch (err) {
-        lastError = err instanceof Error ? err.message : String(err);
+        const msg = err instanceof Error ? err.message : String(err);
+        failures.push(`${name}: ${msg}`);
       }
     }
 
     return {
       ok: false, mode, provider: "none", model: null,
       task_type: taskType,
-      message: this.buildNoProviderMessage(lastError),
+      message: this.buildNoProviderMessage(failures),
       response: "",
       requires_premium_confirmation: false,
       warning: "Nenhum provider disponível"
     };
   }
 
-  private buildNoProviderMessage(lastError: string): string {
-    if (!lastError || lastError.includes("não configurada") || lastError.includes("nao configurada")) {
-      return "Nenhuma IA configurada. Abra Configurações > IA para configurar um provider.";
+  private buildNoProviderMessage(failures: string[]): string {
+    const lastError = failures[failures.length - 1] || "";
+    const joined = failures.map((f) => f.replace(/^(openai|gemini|anthropic|groq|openrouter|ollama): /, "")).join(" | ");
+
+    if (failures.some((f) => /429|quota|rate limit|billing/i.test(f))) {
+      return [
+        "Quota ou limite de API esgotado (ex.: Gemini 429).",
+        "Tentativas: " + failures.map((f) => f.split(":")[0]).join(", "),
+        "Solucao: em Configuracoes > IA desative Gemini, use OpenAI (gpt-4o-mini) ou Groq (gratis), ou inicie Ollama local.",
+        "Reinicie o servidor Nexus apos salvar."
+      ].join(" ");
     }
-    return `Nenhum provider respondeu. Último erro: ${lastError.slice(0, 180)}`;
+
+    if (!lastError || lastError.includes("não configurada") || lastError.includes("nao configurada")) {
+      return [
+        "Nenhuma IA configurada.",
+        "Abra Configurações (ícone engrenagem) > IA:",
+        "• Inicie o Ollama (ollama serve) OU",
+        "• Cole uma API key (OpenAI, Gemini, Anthropic…) e escolha modo Equilibrado/Premium.",
+        "Reinicie o servidor Nexus após salvar."
+      ].join(" ");
+    }
+    if (failures.some((f) => /ollama/i.test(f))) {
+      const details = failures.length > 1 ? ` Erros: ${joined.slice(0, 200)}` : "";
+      return [
+        "Ollama nao esta rodando.",
+        "Verifique: (1) execute 'ollama serve' e (2) instale o modelo com 'ollama pull qwen2.5-coder:7b'.",
+        "Alternativa: desative 'Provider local' em Configuracoes > IA e use OpenAI/Groq.",
+        details
+      ]
+        .filter(Boolean)
+        .join(" ");
+    }
+
+    if (failures.length > 1) {
+      return `Nenhum provider respondeu. Tentativas: ${joined.slice(0, 280)}`;
+    }
+
+    const single = lastError.replace(/^[a-z]+: /i, "");
+    return `Nenhum provider respondeu. Ultimo erro: ${single.slice(0, 180)}`;
   }
 
   private buildMessages(input: RouteChatInput): AIMessage[] {
