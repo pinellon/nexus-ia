@@ -1,6 +1,8 @@
 /* Nexus IDE — core state, API, utilities */
 const state = {
   project: null,
+  appRoot: null,
+  activeProject: null,
   files: [],
   tree: [],
   patches: [],
@@ -81,6 +83,18 @@ function dirname(filePath) {
   return parts.join("/");
 }
 
+function activeProjectRoot() {
+  return state.activeProject?.root || state.project?.root || state.project?.projectPath || "workspace";
+}
+
+function activeProjectName() {
+  return state.activeProject?.name || state.project?.projectName || "workspace";
+}
+
+function activeProjectAbsoluteRoot() {
+  return state.activeProject?.absoluteRoot || state.project?.absoluteRoot || "";
+}
+
 function flattenTree(nodes, files = []) {
   (nodes || []).forEach((node) => {
     if (node.type === "file") files.push(node);
@@ -125,6 +139,7 @@ function buildIDEContext() {
   }
 
   return [
+    `Projeto ativo: ${activeProjectRoot()}`,
     `Arquivo ativo: ${activeDoc?.path || "nenhum"}`,
     `Arquivo modificado: ${activeDoc?.dirty ? "sim" : "nao"}`,
     `Arquivos abertos: ${Array.from(state.openedFiles.keys()).join(", ") || "nenhum"}`,
@@ -162,9 +177,17 @@ function updateCursorStatus() {
 
 async function loadHealth() {
   const res = await api("/api/health");
-  state.project = res.project;
+  state.appRoot = res.appRoot || res.projectRoot || null;
+  state.activeProject = res.activeProject || null;
+  state.project = {
+    ...(res.project || {}),
+    projectName: activeProjectName(),
+    projectPath: activeProjectRoot(),
+    root: activeProjectRoot(),
+    absoluteRoot: state.activeProject?.absoluteRoot
+  };
   const proj = $("#status-project");
-  if (proj) proj.textContent = res.project?.projectName || "Nenhum";
+  if (proj) proj.textContent = `Projeto: ${activeProjectName()}`;
   const mode = $("#status-mode");
   if (mode) mode.textContent = `IA: ${res.mode || "Auto"}`;
   const providerLabel = $("#status-provider-label");
@@ -173,10 +196,10 @@ async function loadHealth() {
     const model = res.ai?.model || res.model || "";
     providerLabel.textContent = model ? `${provider} · ${model}` : String(provider);
   }
-  if (res.project?.projectPath) loadFiles(res.project.projectPath);
+  if (activeProjectRoot()) loadFiles(activeProjectRoot());
 }
 
-async function loadFiles(projectPath) {
+async function loadFiles(projectPath = activeProjectRoot()) {
   try {
     const [projRes, stagedRes] = await Promise.all([
       api("/api/project/tree?projectRoot=" + encodeURIComponent(projectPath)),
@@ -184,7 +207,9 @@ async function loadFiles(projectPath) {
     ]);
     state.tree = projRes.tree || projRes.data || [];
     state.files = flattenTree(state.tree);
-    state.stagedFiles = stagedRes.data || [];
+    state.stagedFiles = (stagedRes.data || []).filter(
+      (file) => file.projectRoot === projectPath || file.projectRoot === activeProjectAbsoluteRoot()
+    );
     renderFileTree();
     if (typeof renderSearchResults === "function") {
       const q = $("#search-input")?.value?.trim();
@@ -279,7 +304,10 @@ window.testProv = async function testProv(id) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ provider: id })
     });
-    if (msg) msg.textContent = res.ok ? "✓ OK" : "✗ Falhou";
+    if (msg) {
+      if (res.ok) msg.textContent = "✓ OK";
+      else msg.textContent = `✗ Falhou: ${res.message || res.error || JSON.stringify(res)}`;
+    }
   } catch {
     if (msg) msg.textContent = "✗ Erro";
   }
@@ -304,6 +332,13 @@ window.NexusIDE = {
   },
   getOpenFiles() {
     return Array.from(state.openedFiles.values()).map((doc) => ({ path: doc.path, dirty: doc.dirty }));
+  },
+  getActiveProject() {
+    return {
+      name: activeProjectName(),
+      root: activeProjectRoot(),
+      absoluteRoot: activeProjectAbsoluteRoot()
+    };
   }
 };
 

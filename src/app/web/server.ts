@@ -9,6 +9,7 @@ import { runEventBus } from "../runs/run-event-bus.js";
 import { addStagedFile, applyStagedFile, clearStagedFiles, getStagedFile, listStagedFiles, removeStagedFile } from "./staged-files.js";
 import { aiRateLimiter } from "../../rate-limit.js";
 import { suggestAgentId } from "../agents/routing.js";
+import { getActiveProject, resolveProjectRootForRequest } from "../../active-project.js";
 
 const contextBuilder = new ContextBuilder();
 const finalEventTypes = new Set(["completed", "failed", "cancelled", "interrupted", "needs_approval"]);
@@ -175,9 +176,10 @@ export function registerAgentRoutes(app: Express) {
     }
 
     try {
+      const activeProject = getActiveProject();
       const context = await contextBuilder.buildContext({
         messages: normalizedMessages,
-        projectRoot: ".",
+        projectRoot: activeProject.root,
         extraContext: typeof project_context === "string" ? project_context : ""
       });
       const uiContext = typeof project_context === "string" ? project_context.slice(0, 10_000) : "";
@@ -226,7 +228,7 @@ export function registerAgentRoutes(app: Express) {
 
       const agentId = suggestAgentId(goal);
       const agentGoal = uiContext ? `${goal}\n\nContexto atual da IDE:\n${uiContext}` : goal;
-      const run = await agentRunner.run_agent(agentId, agentGoal, ".");
+      const run = await agentRunner.run_agent(agentId, agentGoal, activeProject.root);
       const settledRun = await waitForSettledRun(run.id);
       const artifacts = agentRunner.getArtifacts(run.id);
       const patchIds = collectPatchIds(run.id);
@@ -297,7 +299,7 @@ export function registerAgentRoutes(app: Express) {
 
   app.post("/api/staged-files/:id/apply", async (req, res) => {
     try {
-      const file = await applyStagedFile(".", req.params.id);
+      const file = await applyStagedFile(getActiveProject().root, req.params.id);
       return res.json({ ok: true, data: file });
     } catch (err) {
       return res.status(400).json({ ok: false, error: err instanceof Error ? err.message : String(err) });
@@ -318,6 +320,7 @@ export function registerAgentRoutes(app: Express) {
       if (!version) return res.status(404).json({ ok: false, error: "Version not found" });
       
       const updated = await addStagedFile({
+        projectRoot: file.projectRoot,
         path: file.path,
         language: file.language,
         content: version.content,
@@ -363,7 +366,11 @@ export function registerAgentRoutes(app: Express) {
 
     try {
       const selectedAgentId = agent_id?.trim() || suggestAgentId(goal.trim());
-      const run = await agentRunner.run_agent(selectedAgentId, goal.trim(), project_root?.trim() || ".");
+      const run = await agentRunner.run_agent(
+        selectedAgentId,
+        goal.trim(),
+        resolveProjectRootForRequest(project_root?.trim())
+      );
       return res.status(202).json({
         ok: true,
         run_id: run.id,

@@ -19,7 +19,9 @@ function initAiPanel() {
     const stagedHtml = (state.stagedFiles || []).find((file) => file.run_id && /(?:^|\/)index\.html$/i.test(file.path));
     if (stagedHtml?.run_id) return `/preview/staged/${encodeURIComponent(stagedHtml.run_id)}/index.html`;
     const active = window.NexusIDE?.getActiveFile?.();
-    if (active?.path === "public/index.html" || /\/index\.html$/i.test(active?.path || "")) return "/";
+    if (active?.path === "public/index.html" || /\/index\.html$/i.test(active?.path || "")) {
+      return `/api/project/file?projectRoot=${encodeURIComponent(activeProjectRoot())}&path=${encodeURIComponent(active.path)}`;
+    }
     return "/";
   }
 
@@ -70,7 +72,7 @@ function initAiPanel() {
         if (data.run_id && typeof startAgentProgress === "function") {
           startAgentProgress(data.run_id);
         }
-        if (state.project) loadFiles(state.project.projectPath);
+        if (state.project) loadFiles(activeProjectRoot());
         if (data.patch_ids?.length) {
           if (state.agentProgress) mergeAgentPatchIds(data.patch_ids);
           if (typeof openPatchesPanel === "function") {

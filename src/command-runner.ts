@@ -1,5 +1,7 @@
 import { spawn } from "node:child_process";
 
+import { getRepositoryRoot } from "./project-file-store.js";
+
 const MAX_LOG_SIZE = 20_000;
 const COMMAND_TIMEOUT_MS = 30_000;
 const SAFE_PACKAGE_NAME = /^(?:@[a-z0-9-~][a-z0-9-._~]*\/)?[a-z0-9-~][a-z0-9-._~]*$/i;
@@ -49,10 +51,18 @@ function executeProcess(command: string, args: string[], cwd: string, id: Comman
   const isWindowsNpm = process.platform === "win32" && command === "npm";
   const executable = isWindowsNpm ? "cmd.exe" : command;
   const finalArgs = isWindowsNpm ? ["/d", "/s", "/c", "npm", ...args] : args;
+  const env =
+    command === "git"
+      ? {
+          ...process.env,
+          GIT_CEILING_DIRECTORIES: getRepositoryRoot()
+        }
+      : process.env;
 
   return new Promise<CommandRunResult>((resolve, reject) => {
     const child = spawn(executable, finalArgs, {
       cwd,
+      env,
       shell: false,
       windowsHide: true
     });

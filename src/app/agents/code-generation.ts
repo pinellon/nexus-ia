@@ -164,6 +164,7 @@ Requisitos:
   }
 
   await addStagedFile({
+    projectRoot: run.projectRoot,
     path: draftPath,
     language,
     content,

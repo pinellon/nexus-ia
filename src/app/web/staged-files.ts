@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { projectFileExists, readProjectFile, writeProjectFile } from "../../project-file-store.js";
+import { projectFileExists, readProjectFile, resolveProjectRoot, writeProjectFile } from "../../project-file-store.js";
 import { nowIso } from "../agents/utils.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -19,6 +19,7 @@ export interface StagedFileVersion {
 
 export interface StagedFile {
   id: string;
+  projectRoot?: string;
   path: string;
   language: string;
   content: string;
@@ -121,6 +122,13 @@ export async function clearStagedFiles() {
 export async function applyStagedFile(projectRoot: string, id: string) {
   await loadDb();
   const file = store.get(id);
+  if (file?.projectRoot) {
+    const activeRoot = resolveProjectRoot(projectRoot).absoluteRoot;
+    const stagedRoot = resolveProjectRoot(file.projectRoot).absoluteRoot;
+    if (activeRoot !== stagedRoot) {
+      throw new Error("Este patch aponta para fora do projeto ativo e foi bloqueado por seguranca.");
+    }
+  }
   if (!file) throw new Error(`Staged file não encontrado: ${id}`);
   
   const exists = await projectFileExists(projectRoot, file.path);

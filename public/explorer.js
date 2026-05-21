@@ -91,10 +91,10 @@ function askExplorerPath({ title, help, value = "", confirmLabel = "Confirmar" }
 
 async function refreshExplorerTree() {
   try {
-    if (!state.project?.projectPath) {
+    if (!state.activeProject?.root) {
       await loadHealth();
     } else {
-      await loadFiles(state.project.projectPath);
+      await loadFiles(activeProjectRoot());
     }
     setStatus("Explorer atualizado");
   } catch (error) {
@@ -107,7 +107,7 @@ function renderFileTree() {
   if (!tree) return;
   tree.innerHTML = "";
   if (!state.tree.length && !state.stagedFiles?.length) {
-    tree.innerHTML = '<div class="empty-state">Nenhum arquivo</div>';
+    tree.innerHTML = '<div class="empty-state">Workspace vazio. Crie um arquivo ou peça ao Nexus para gerar um projeto.</div>';
     return;
   }
 
@@ -173,10 +173,10 @@ async function createProjectFile() {
     await api("/api/project/file", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ projectRoot: state.project?.projectPath || ".", path: filePath, content: "" })
+      body: JSON.stringify({ projectRoot: activeProjectRoot(), path: filePath, content: "" })
     });
     state.expandedDirs.add(dirname(filePath));
-    await loadFiles(state.project.projectPath);
+    await loadFiles(activeProjectRoot());
     await openFile(filePath);
     setStatus("Arquivo criado: " + filePath);
   } catch (error) {
@@ -195,10 +195,10 @@ async function createProjectFolderFromPrompt() {
     await api("/api/project/folder", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ projectRoot: state.project?.projectPath || ".", path: folderPath })
+      body: JSON.stringify({ projectRoot: activeProjectRoot(), path: folderPath })
     });
     state.expandedDirs.add(dirname(folderPath));
-    await loadFiles(state.project.projectPath);
+    await loadFiles(activeProjectRoot());
     setStatus("Pasta criada: " + folderPath);
   } catch (error) {
     alert("Erro: " + error.message);
@@ -217,7 +217,7 @@ async function renameTreePath(oldPath) {
     await api("/api/project/rename", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ projectRoot: state.project?.projectPath || ".", oldPath, newPath })
+      body: JSON.stringify({ projectRoot: activeProjectRoot(), oldPath, newPath })
     });
     const renamedEntries = [];
     state.openedFiles.forEach((doc, filePath) => {
@@ -235,7 +235,7 @@ async function renameTreePath(oldPath) {
       if (state.activePath === from) state.activePath = to;
     });
     if (state.activePath) setActiveDocument(state.activePath);
-    await loadFiles(state.project.projectPath);
+    await loadFiles(activeProjectRoot());
     renderOpenFileTabs();
     setStatus("Renomeado: " + newPath);
   } catch (error) {
@@ -263,7 +263,7 @@ async function deleteTreePath(targetPath, type) {
     const endpoint = type === "directory" ? "/api/project/folder" : "/api/project/file";
     const confirmQuery = type === "directory" ? "&confirm=true" : "";
     await api(
-      `${endpoint}?projectRoot=${encodeURIComponent(state.project?.projectPath || ".")}&path=${encodeURIComponent(targetPath)}${confirmQuery}`,
+      `${endpoint}?projectRoot=${encodeURIComponent(activeProjectRoot())}&path=${encodeURIComponent(targetPath)}${confirmQuery}`,
       { method: "DELETE" }
     );
     if (type === "directory") {
@@ -275,7 +275,7 @@ async function deleteTreePath(targetPath, type) {
       state.openedFiles.delete(targetPath);
       if (state.activePath === targetPath) clearEditorIfNoActiveFile();
     }
-    await loadFiles(state.project.projectPath);
+    await loadFiles(activeProjectRoot());
     renderOpenFileTabs();
     setStatus(`${label} deletado`);
   } catch (error) {

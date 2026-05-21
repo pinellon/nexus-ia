@@ -207,7 +207,7 @@ async function saveActiveFile() {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        projectRoot: state.project?.projectPath || ".",
+        projectRoot: activeProjectRoot(),
         path: doc.path,
         content
       })
@@ -237,7 +237,7 @@ async function openFile(filePath, stagedFile = null, options = {}) {
     }
     const res = await api(
       "/api/project/file?projectRoot=" +
-        encodeURIComponent(state.project.projectPath) +
+        encodeURIComponent(activeProjectRoot()) +
         "&filePath=" +
         encodeURIComponent(filePath)
     );

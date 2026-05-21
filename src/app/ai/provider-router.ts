@@ -1,4 +1,4 @@
-import { loadAISettings, resolveProviderConfig, type AISettings, type ProviderName } from "./ai-settings.js";
+import { loadAISettings, resolveProviderConfig, hasProviderKey, type AISettings, type ProviderName } from "./ai-settings.js";
 import { AnthropicProvider } from "./providers/anthropic-provider.js";
 import { GeminiProvider } from "./providers/gemini-provider.js";
 import { GroqProvider, OpenRouterProvider } from "./providers/groq-openrouter-provider.js";
@@ -28,6 +28,7 @@ export interface RouteChatInput {
   goal: string;
   allowPremium?: boolean;
   forceLocal?: boolean;
+  forceProvider?: ProviderName;
 }
 
 export interface RouteChatResult {
@@ -106,9 +107,31 @@ export class AIProviderRouter {
   }
 
   private configuredFallbackProviders(s: AISettings): ProviderName[] {
-    return PREMIUM_FALLBACK_ORDER.filter(
-      (name) => s.providers[name]?.enabled && Boolean(s.providers[name]?.apiKey)
+    return this.sortProvidersByReliability(
+      PREMIUM_FALLBACK_ORDER.filter(
+        (name) => s.providers[name]?.enabled && hasProviderKey(s.providers[name])
+      )
     );
+  }
+
+  private orderedCloudProviders(s: AISettings): ProviderName[] {
+    const cloud = this.configuredFallbackProviders(s);
+    const preferred = s.provider !== "auto" ? s.provider : null;
+
+    if (preferred && preferred !== "ollama" && cloud.includes(preferred)) {
+      return [preferred, ...cloud.filter((name) => name !== preferred)];
+    }
+
+    if (!preferred) {
+      return this.prioritizePremiumProvider(s, cloud);
+    }
+
+    return cloud;
+  }
+
+  private prioritizePremiumProvider(s: AISettings, providers: ProviderName[]): ProviderName[] {
+    if (!s.premiumProvider || !providers.includes(s.premiumProvider)) return providers;
+    return [s.premiumProvider, ...providers.filter((name) => name !== s.premiumProvider)];
   }
 
   private sortProvidersByReliability(names: ProviderName[]): ProviderName[] {
@@ -146,8 +169,8 @@ export class AIProviderRouter {
     const goal = input.goal || getLatestUserMessage(input.messages);
     const taskType = classifyTask(goal);
 
-    // Build priority list based on mode
-    const order = this.buildProviderOrder(s, taskType, input);
+    // Build priority list based on mode, or force a specific provider for testing
+    const order = input.forceProvider ? [input.forceProvider] : this.buildProviderOrder(s, taskType, input);
 
     // Check if requires premium confirmation
     if (s.requirePremiumConfirmation && !input.allowPremium && !input.forceLocal) {
@@ -171,6 +194,16 @@ export class AIProviderRouter {
     let resolvedOrder = await this.filterReachableOrder(order as ProviderName[]);
 
     if (!resolvedOrder.length) {
+      if (input.forceProvider) {
+        return {
+          ok: false, mode: s.mode, provider: "none", model: null,
+          task_type: taskType,
+          message: `Provider forçado ${input.forceProvider} não disponível.`,
+          response: "",
+          requires_premium_confirmation: false,
+          warning: "Nenhum provider disponível"
+        };
+      }
       resolvedOrder = this.configuredFallbackProviders(s);
     }
 
@@ -191,9 +224,13 @@ export class AIProviderRouter {
 
   private buildProviderOrder(s: AISettings, task: "simple" | "medium" | "complex", input: RouteChatInput): string[] {
     if (input.forceLocal) return ["ollama"];
-    if (s.mode === "manual" && s.provider !== "auto") return [s.provider];
+    const cloudProviders = this.configuredFallbackProviders(s);
+    const preferred = s.provider !== "auto" && cloudProviders.includes(s.provider)
+      ? s.provider
+      : null;
+    if (s.mode === "manual" && preferred) return [preferred];
 
-    const cloud = this.configuredFallbackProviders(s);
+    const cloud = this.orderedCloudProviders(s);
     const ollamaOn = s.providers.ollama.enabled;
 
     if (s.mode === "economy") {
@@ -207,8 +244,16 @@ export class AIProviderRouter {
       return ollamaOn ? [...cloud, "ollama"] : cloud;
     }
 
-    // balanced: cloud first (openai before gemini), ollama last
-    if (task === "simple" && ollamaOn) return ["ollama", ...cloud];
+    // balanced: local for simple tasks; configured provider for medium/complex
+    if (task === "simple" && ollamaOn) {
+      return ["ollama", ...cloud.filter((name) => name !== "ollama")];
+    }
+
+    if (preferred) {
+      const ordered = [preferred, ...cloud.filter((name) => name !== preferred && name !== "ollama")];
+      return ollamaOn && preferred !== "ollama" ? [preferred, "ollama", ...ordered.filter((name) => name !== preferred && name !== "ollama")] : ordered;
+    }
+
     return ollamaOn ? [...cloud, "ollama"] : cloud;
   }
 
@@ -280,11 +325,12 @@ export class AIProviderRouter {
       ].join(" ");
     }
     if (failures.some((f) => /ollama/i.test(f))) {
+      const details = failures.length > 1 ? ` Erros: ${joined.slice(0, 200)}` : "";
       return [
-        "Ollama nao esta rodando e os providers na nuvem falharam.",
-        "Opcoes: (1) ollama serve + ollama pull qwen2.5-coder:7b",
-        "ou (2) corrija API key OpenAI em Configuracoes > IA (modelo gpt-4o-mini).",
-        failures.length > 1 ? `Erros: ${joined.slice(0, 200)}` : ""
+        "Ollama nao esta rodando.",
+        "Verifique: (1) execute 'ollama serve' e (2) instale o modelo com 'ollama pull qwen2.5-coder:7b'.",
+        "Alternativa: desative 'Provider local' em Configuracoes > IA e use OpenAI/Groq.",
+        details
       ]
         .filter(Boolean)
         .join(" ");

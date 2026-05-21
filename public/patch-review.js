@@ -478,7 +478,7 @@ window.applyPatch = async function applyPatch(id) {
     state.activePatch = null;
     showPatchAppliedState(filePath);
     await loadPatches();
-    if (state.project) await loadFiles(state.project.projectPath);
+    if (state.project) await loadFiles(activeProjectRoot());
   } catch (e) {
     const msg = String(e.message || e);
     if (msg.includes("mudou desde")) showStalePatchAlert();
@@ -489,10 +489,18 @@ window.applyPatch = async function applyPatch(id) {
 window.openProjectPreview = function openProjectPreview(filePath) {
   if (!filePath) return;
   if (filePath === "public/index.html" || filePath.endsWith("/index.html")) {
-    window.open("/", "_blank", "noopener,noreferrer");
+    window.open(
+      `/api/project/file?projectRoot=${encodeURIComponent(activeProjectRoot())}&path=${encodeURIComponent(filePath)}`,
+      "_blank",
+      "noopener,noreferrer"
+    );
     return;
   }
-  window.open(`/api/project/file?path=${encodeURIComponent(filePath)}`, "_blank", "noopener,noreferrer");
+  window.open(
+    `/api/project/file?projectRoot=${encodeURIComponent(activeProjectRoot())}&path=${encodeURIComponent(filePath)}`,
+    "_blank",
+    "noopener,noreferrer"
+  );
 };
 
 window.rejectPatch = async function rejectPatch(id) {
