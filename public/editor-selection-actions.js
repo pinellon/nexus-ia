@@ -57,7 +57,7 @@
       label: "Revisar segurança",
       icon: "codicon-shield",
       description: "Identificar problemas de segurança",
-      requiresSave: false,
+      requiresSave: true,
       generatesPatch: true
     }
   };
@@ -431,14 +431,31 @@ Reporte problemas e sugira patches se aplicável.`
 
     // Set the prompt and metadata
     chatInput.value = prompt;
-    chatInput.dataset.pendingContext = `[Seleção: ${selectionContext.filePath} linhas ${selectionContext.startLine}-${selectionContext.endLine}]`;
+    
+    // Build complete selection context for pendingContext
+    const contextInfo = [
+      `Arquivo: ${selectionContext.filePath}`,
+      `Linguagem: ${selectionContext.language}`,
+      `Linhas: ${selectionContext.startLine}-${selectionContext.endLine}`,
+      `Trecho selecionado (${selectionContext.selectedText.length} chars${selectionContext.selectedTextTruncated ? ', truncado' : ''}):`,
+      '```' + selectionContext.language,
+      selectionContext.selectedText,
+      '```',
+      `Arquivo completo (${selectionContext.fullFileContent.length} chars${selectionContext.fileTruncated ? ', truncado' : ''}):`
+    ].join('\n');
+    
+    chatInput.dataset.pendingContext = contextInfo;
     chatInput.dataset.selectionAction = actionId;
     chatInput.dataset.selectionContext = JSON.stringify({
       filePath: selectionContext.filePath,
       language: selectionContext.language,
       selectedText: selectionContext.selectedText,
       startLine: selectionContext.startLine,
-      endLine: selectionContext.endLine
+      endLine: selectionContext.endLine,
+      fullFileContent: selectionContext.fullFileContent,
+      dirty: selectionContext.dirty,
+      selectedTextTruncated: selectionContext.selectedTextTruncated,
+      fileTruncated: selectionContext.fileTruncated
     });
 
     // Focus and trigger input event
@@ -450,10 +467,19 @@ Reporte problemas e sugira patches se aplicável.`
       setStatus(`Enviando "${actionInfo.label}" para IA...`);
     }
 
-    // Open AI panel if not visible
-    const aiTab = document.querySelector(".activity-btn[data-target='devmind']");
-    if (aiTab && !aiTab.classList.contains("active")) {
-      aiTab.click();
+    // Open AI panel if collapsed
+    const expandBtn = document.getElementById("btn-expand-ai");
+    const aiPanel = document.getElementById("ai-panel");
+    const aiPanelCollapsed = document.getElementById("ai-panel-collapsed");
+    
+    if (expandBtn && aiPanelCollapsed && aiPanelCollapsed.style.display !== "none") {
+      // Panel is collapsed, expand it
+      expandBtn.click();
+    }
+    
+    // Ensure panel is visible and focused
+    if (aiPanel) {
+      aiPanel.style.display = "flex";
     }
   }
 
