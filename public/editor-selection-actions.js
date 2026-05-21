@@ -74,14 +74,16 @@
     history: [], // recent selection actions
     analytics: {}, // action counts
     favorites: [],
-    undoStack: []
+    undoStack: [],
+    customActions: []
   };
 
   const PERSIST_KEYS = {
     HISTORY: "esa_history_v1",
     ANALYTICS: "esa_analytics_v1",
     FAVORITES: "esa_favorites_v1",
-    UNDO: "esa_undo_v1"
+    UNDO: "esa_undo_v1",
+    CUSTOM: "esa_custom_actions_v1"
   };
 
   // ── Utilities ──────────────────────────────────────────────────────────────
@@ -170,6 +172,9 @@
     // Favorites
     const fav = loadFromStorage(PERSIST_KEYS.FAVORITES, []);
     state.favorites = Array.isArray(fav) ? fav : [];
+    // Custom actions
+    const ca = loadFromStorage(PERSIST_KEYS.CUSTOM, []);
+    state.customActions = Array.isArray(ca) ? ca : [];
     // Undo stack
     state.undoStack = loadFromStorage(PERSIST_KEYS.UNDO, []);
   }
@@ -381,6 +386,87 @@
     renderBody();
   }
 
+  // Custom actions helpers
+  function findCustomAction(id) {
+    if (!Array.isArray(state.customActions)) return null;
+    return state.customActions.find((a) => a.id === id) || null;
+  }
+
+  function getAllActionIds() {
+    const builtIn = Object.keys(ACTION_TYPES);
+    const custom = Array.isArray(state.customActions) ? state.customActions.map(a => a.id) : [];
+    return [...builtIn, ...custom];
+  }
+
+  function getActionInfoById(id) {
+    if (ACTION_TYPES[id]) return { ...ACTION_TYPES[id], _builtin: true };
+    const c = findCustomAction(id);
+    if (c) return { label: c.label || c.id, icon: c.icon || 'codicon-star', description: c.description || '', requiresSave: !!c.requiresSave, generatesPatch: !!c.generatesPatch, promptTemplate: c.promptTemplate, _builtin: false };
+    return null;
+  }
+
+  function interpolateTemplate(template, context) {
+    if (!template) return null;
+    return String(template).replace(/\{\{\s*(\w+)\s*\}\}/g, (m, key) => {
+      switch (key) {
+        case 'selectedText': return context.selectedText || '';
+        case 'filePath': return context.filePath || '';
+        case 'language': return context.language || '';
+        case 'startLine': return context.startLine || '';
+        case 'endLine': return context.endLine || '';
+        case 'fullFileContent': return context.fullFileContent || '';
+        default: return '';
+      }
+    });
+  }
+
+  function showCustomActionsModal() {
+    const rows = (state.customActions || []).map((a) => {
+      return `<div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><div><strong>${esc(a.label)}</strong><div style="font-size:11px;color:var(--vscode-muted)">${esc(a.description||'')}</div></div><div><button class="esa-edit-custom btn-ghost" data-id="${esc(a.id)}">Editar</button><button class="esa-delete-custom btn-ghost" data-id="${esc(a.id)}">Deletar</button></div></div><pre class="code-view" style="margin-top:8px">${esc(a.promptTemplate||'')}</pre></div>`;
+    }).join('');
+
+    const overlay = createModal('Ações customizadas', rows || '<div class="empty-state">Nenhuma ação customizada</div>', [
+      { label: 'Adicionar', className: 'btn-primary', onClick: () => { showEditCustomModal(); } },
+      { label: 'Fechar', className: 'btn-secondary', onClick: () => {} }
+    ]);
+
+    overlay.querySelectorAll('.esa-edit-custom').forEach(btn => btn.addEventListener('click', (e) => {
+      const id = btn.dataset.id; const c = findCustomAction(id); if (c) showEditCustomModal(c);
+    }));
+    overlay.querySelectorAll('.esa-delete-custom').forEach(btn => btn.addEventListener('click', (e) => {
+      const id = btn.dataset.id; state.customActions = (state.customActions || []).filter(x => x.id !== id); saveToStorage(PERSIST_KEYS.CUSTOM, state.customActions); renderSelectionBar(); overlay.remove(); showCustomActionsModal();
+    }));
+  }
+
+  function showEditCustomModal(existing) {
+    const item = existing ? { ...existing } : { id: `custom_${Date.now()}`, label: '', icon: 'codicon-star', description: '', promptTemplate: '', requiresSave: false, generatesPatch: false };
+    const body = `
+      <div class="form-group"><label>Label</label><input id="esa-custom-label" value="${esc(item.label)}" /></div>
+      <div class="form-group"><label>Description</label><input id="esa-custom-desc" value="${esc(item.description)}" /></div>
+      <div class="form-group"><label>Prompt template</label><textarea id="esa-custom-prompt" rows="6">${esc(item.promptTemplate)}</textarea><div style="font-size:11px;color:var(--vscode-muted);margin-top:6px">Use placeholders: {{selectedText}}, {{filePath}}, {{language}}, {{startLine}}, {{endLine}}, {{fullFileContent}}</div></div>
+      <div class="form-group checkbox"><input type="checkbox" id="esa-custom-requires-save" ${item.requiresSave ? 'checked' : ''} /><label for="esa-custom-requires-save">Requer salvar arquivo antes</label></div>
+      <div class="form-group checkbox"><input type="checkbox" id="esa-custom-generates-patch" ${item.generatesPatch ? 'checked' : ''} /><label for="esa-custom-generates-patch">Gera patch</label></div>
+    `;
+
+    const overlay = createModal(existing ? 'Editar ação customizada' : 'Nova ação customizada', body, [
+      { label: 'Salvar', className: 'btn-primary', onClick: () => {
+          const label = overlay.querySelector('#esa-custom-label').value.trim();
+          const desc = overlay.querySelector('#esa-custom-desc').value.trim();
+          const prompt = overlay.querySelector('#esa-custom-prompt').value;
+          const requiresSave = !!overlay.querySelector('#esa-custom-requires-save').checked;
+          const generatesPatch = !!overlay.querySelector('#esa-custom-generates-patch').checked;
+          if (!label) { alert('Label é obrigatório'); return; }
+          const newItem = { id: item.id, label, description: desc, promptTemplate: prompt, requiresSave, generatesPatch };
+          // replace or add
+          state.customActions = (state.customActions || []).filter(x => x.id !== newItem.id);
+          state.customActions.unshift(newItem);
+          saveToStorage(PERSIST_KEYS.CUSTOM, state.customActions);
+          renderSelectionBar();
+        } },
+      { label: 'Cancelar', className: 'btn-secondary', onClick: () => {} }
+    ]);
+  }
+
   // Debounced render to avoid flicker while selecting
   function debouncedRenderSelectionBar(delay = 180) {
     try {
@@ -527,8 +613,16 @@ Procure por:
 
 Reporte problemas e sugira patches se aplicável.`
     };
+    if (prompts[actionType]) return prompts[actionType];
 
-    return prompts[actionType] || null;
+    // Check custom actions
+    const custom = findCustomAction(actionType);
+    if (custom && custom.promptTemplate) {
+      // Interpolate template
+      return interpolateTemplate(custom.promptTemplate, selectionContext);
+    }
+
+    return null;
   }
 
   // ── Selection Bar UI ───────────────────────────────────────────────────────
@@ -610,20 +704,25 @@ Reporte problemas e sugira patches se aplicável.`
       })
       .join("");
 
-    // Reorder actions: favorited actions first (preserve user order)
-    const allIds = Object.keys(ACTION_TYPES);
+    // Reorder actions: favorited actions first (preserve user order) and include custom actions
+    const builtInIds = Object.keys(ACTION_TYPES);
+    const customIds = Array.isArray(state.customActions) ? state.customActions.map(a => a.id) : [];
+    const allIds = [...builtInIds, ...customIds];
     const favoriteIds = Array.isArray(state.favorites) ? state.favorites.filter(id => allIds.includes(id)) : [];
     const remainingIds = allIds.filter(id => !favoriteIds.includes(id));
     const orderedIds = [...favoriteIds, ...remainingIds];
 
     bar.innerHTML = orderedIds.map((actionId) => {
-      const actionInfo = ACTION_TYPES[actionId];
+      const isCustom = customIds.includes(actionId);
+      const actionInfo = isCustom ? findCustomAction(actionId) : ACTION_TYPES[actionId];
       const canDo = canPerformAction(actionInfo, activeDoc);
       const blockingReason = getBlockingReason(actionInfo, activeDoc);
       const disabled = !canDo;
-      const title = blockingReason || actionInfo.description;
+      const title = blockingReason || (actionInfo && actionInfo.description) || '';
       const ariaDisabled = disabled ? "true" : "false";
       const isFav = favoriteIds.includes(actionId);
+      const icon = (isCustom ? (actionInfo.icon || 'codicon-star') : actionInfo.icon) || '';
+      const label = isCustom ? (actionInfo.label || actionId) : actionInfo.label;
 
       return `
         <div class="esa-action-wrap" style="display:inline-flex;align-items:center;gap:6px">
@@ -636,8 +735,8 @@ Reporte problemas e sugira patches se aplicável.`
             style="padding:6px 10px;border:1px solid var(--vscode-button-border, transparent);background:var(--vscode-button-background, #007acc);color:var(--vscode-button-foreground, white);border-radius:3px;cursor:${disabled ? 'not-allowed' : 'pointer'};opacity:${disabled ? 0.5 : 1};font-size:12px;white-space:nowrap;display:flex;align-items:center;gap:4px;"
             ${disabled ? 'disabled' : ''}
           >
-            <i class="codicon ${esc(actionInfo.icon)}" style="font-size:14px;"></i>
-            <span>${esc(actionInfo.label)}</span>
+            <i class="codicon ${esc(icon)}" style="font-size:14px;"></i>
+            <span>${esc(label)}</span>
           </button>
           <button class="esa-fav-toggle" data-fav="${esc(actionId)}" title="${isFav ? 'Remover favorito' : 'Favoritar'}" style="background:transparent;border:none;color:var(--vscode-yellow);font-size:14px;cursor:pointer;padding:2px 6px">${isFav ? '★' : '☆'}</button>
         </div>
@@ -673,6 +772,7 @@ Reporte problemas e sugira patches se aplicável.`
     extras.innerHTML = `
       <button id="esa-history-btn" class="btn-ghost" title="Histórico">Histórico</button>
       <button id="esa-analytics-btn" class="btn-ghost" title="Estatísticas">Estatísticas</button>
+      <button id="esa-custom-btn" class="btn-ghost" title="Ações customizadas">Ações</button>
       <button id="esa-reorder-btn" class="btn-ghost" title="Reordenar favoritos">Reordenar</button>
       <button id="esa-undo-btn" class="btn-ghost" title="Desfazer última alteração">Desfazer</button>
     `;
@@ -689,6 +789,8 @@ Reporte problemas e sugira patches se aplicável.`
     const undoBtn = bar.querySelector('#esa-undo-btn');
     if (histBtn) histBtn.addEventListener('click', (e) => { e.preventDefault(); showHistoryModal(); });
     if (statsBtn) statsBtn.addEventListener('click', (e) => { e.preventDefault(); showAnalyticsModal(); });
+    const customBtn = bar.querySelector('#esa-custom-btn');
+    if (customBtn) customBtn.addEventListener('click', (e) => { e.preventDefault(); showCustomActionsModal(); });
     const reorderBtn = bar.querySelector('#esa-reorder-btn');
     if (reorderBtn) reorderBtn.addEventListener('click', (e) => { e.preventDefault(); showReorderModal(); });
     if (undoBtn) undoBtn.addEventListener('click', (e) => { e.preventDefault(); undoLast(); });
@@ -718,7 +820,7 @@ Reporte problemas e sugira patches se aplicável.`
       return;
     }
 
-    const actionInfo = ACTION_TYPES[actionId];
+    const actionInfo = getActionInfoById(actionId);
     if (!actionInfo) {
       console.warn("Unknown action:", actionId);
       return;
@@ -881,6 +983,16 @@ Reporte problemas e sugira patches se aplicável.`
             run: () => handleActionClick(actionId)
           });
         });
+        // Register custom actions as well
+        (state.customActions || []).forEach((c) => {
+          window.monaco.editor.registerAction({
+            id: `nexus.editor.${c.id}`,
+            label: `Nexus: ${c.label}`,
+            contextMenuGroupId: "9_cutcopypaste",
+            keybindings: [],
+            run: () => handleActionClick(c.id)
+          });
+        });
       }
     } catch (err) {
       console.debug("Monaco context menu integration not available:", err.message);
@@ -917,9 +1029,15 @@ Reporte problemas e sugira patches se aplicável.`
     hide: hideSelectionBar,
 
     /**
-     * Get action types
+     * Get action types (including custom actions)
      */
-    getActionTypes: () => ({ ...ACTION_TYPES }),
+    getActionTypes: () => {
+      const merged = { ...ACTION_TYPES };
+      (state.customActions || []).forEach((c) => {
+        merged[c.id] = { label: c.label, icon: c.icon, description: c.description, requiresSave: !!c.requiresSave, generatesPatch: !!c.generatesPatch };
+      });
+      return merged;
+    },
 
     /**
      * Build action prompt
