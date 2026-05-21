@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import path from "node:path";
 
-import { listProjectTree, resolveProjectRoot } from "./project-file-store.js";
+import { getRepositoryRoot, listProjectTree, resolveProjectRoot } from "./project-file-store.js";
 
 export interface ProjectSnapshot {
   projectName: string;
@@ -24,7 +24,11 @@ function runGitCommand(projectRoot: string, args: string[]) {
   const result = spawnSync("git", args, {
     cwd: projectRoot,
     encoding: "utf8",
-    windowsHide: true
+    windowsHide: true,
+    env: {
+      ...process.env,
+      GIT_CEILING_DIRECTORIES: getRepositoryRoot()
+    }
   });
 
   if (result.error || result.status !== 0) {

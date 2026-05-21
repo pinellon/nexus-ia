@@ -1,11 +1,8 @@
 import { mkdir, readdir, readFile as readFsFile, rename, rm, stat, writeFile as writeFsFile } from "node:fs/promises";
 import path from "node:path";
 import { createHash } from "node:crypto";
-import { fileURLToPath } from "node:url";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const repositoryRoot = path.resolve(__dirname, "..");
+const repositoryRoot = process.env.NEXUS_APP_ROOT ? path.resolve(process.env.NEXUS_APP_ROOT) : process.cwd();
 
 const MAX_FILE_SIZE_BYTES = 512 * 1024;
 const MAX_TREE_ENTRIES = 1_500;
