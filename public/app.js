@@ -355,6 +355,7 @@ function initApp() {
   initTerminal();
   initAiPanel();
   if (typeof initSearch === "function") initSearch();
+  if (typeof initCommandPalette === "function") initCommandPalette();
 
   $("#btn-save-ia")?.addEventListener("click", async () => {
     try {

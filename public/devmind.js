@@ -92,6 +92,14 @@
     </div>`;
   }
 
+  function renderPreviewRow(url) {
+    if (!url) return "";
+    return `<div class="dm-patch-notice">
+      <span>Preview pronto para conferir a mudanca visual.</span>
+      <button type="button" class="dm-btn dm-btn-accent" data-dm-action="open_preview" data-dm-type="preview" data-dm-value="${esc(url)}">Abrir preview</button>
+    </div>`;
+  }
+
   function renderPendingPatchSticky() {
     const last = [...state.history].reverse().find((m) => m.role === "assistant" && m.patchIds?.length);
     if (!last?.patchIds?.length) return "";
@@ -172,6 +180,7 @@
       const extra = [];
       if (msg.progress) extra.push(renderProgress(msg.progress));
       if (msg.patchIds) extra.push(renderPatchRow(msg.patchIds, msg.patchPaths));
+      if (msg.previewUrl) extra.push(renderPreviewRow(msg.previewUrl));
       if (msg.confirmDecision) extra.push(renderConfirmBox(msg.confirmDecision));
       if (msg.techData)  extra.push(renderTechDetails(msg.techData));
       if (msg.planProposal) extra.push(renderPlanBox(msg.planProposal));
@@ -337,6 +346,8 @@
       role: "assistant",
       content: summary,
       patchIds: data.patch_ids?.length ? data.patch_ids : null,
+      patchPaths: data.patch_paths?.length ? data.patch_paths : null,
+      previewUrl: data.preview_url || null,
       techData: data
     };
 

@@ -13,6 +13,9 @@ Esta versao entrega o nucleo usavel do produto:
 - Patch Review visual com Monaco Diff Editor.
 - Progresso de agentes em tempo real via Server-Sent Events.
 - Execucao controlada de comandos de build, typecheck, test e Git.
+- Corrigir com Nexus a partir do erro real de build/typecheck/test.
+- Commit assistido com mensagem gerada e confirmacao explicita.
+- Context Builder seletivo para reduzir contexto enviado para IA.
 - Rate limit em endpoints caros.
 - Testes automatizados e CI.
 - Persistencia minima de runs em JSONL.
@@ -219,6 +222,12 @@ POST /api/git/commit-message
 POST /api/git/commit
 ```
 
+Fluxo dev:
+
+```text
+POST /api/dev/fix-command
+```
+
 ## Estrutura
 
 ```text
@@ -273,6 +282,7 @@ npm run ci
 - O modo local depende do Ollama estar rodando e do modelo estar instalado.
 - Providers premium podem gerar custo; use modo economico quando necessario.
 - Preview visual e deploy ainda sao etapas futuras.
+- O commit assistido nao faz push automatico.
 
 ## Proximos Passos
 

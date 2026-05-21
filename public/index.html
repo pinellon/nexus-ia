@@ -156,6 +156,7 @@
       <div class="ai-panel-tools">
         <button type="button" class="btn-secondary btn-sm" id="btn-use-file-context"><i class="codicon codicon-file-code"></i> Arquivo</button>
         <button type="button" class="btn-secondary btn-sm" id="btn-use-selection-context"><i class="codicon codicon-selection"></i> Seleção</button>
+        <button type="button" class="btn-secondary btn-sm" id="btn-open-preview"><i class="codicon codicon-open-preview"></i> Preview</button>
       </div>
       <div class="ai-panel-body">
         <div id="devmindChat"></div>
@@ -183,9 +184,20 @@
           <button type="button" class="icon-btn" id="btn-clear-terminal" title="Limpar"><i class="codicon codicon-clear-all"></i></button>
           <button type="button" class="icon-btn" id="btn-run-typecheck"><i class="codicon codicon-check"></i> typecheck</button>
           <button type="button" class="icon-btn" id="btn-run-build"><i class="codicon codicon-package"></i> build</button>
+          <button type="button" class="icon-btn" id="btn-run-test"><i class="codicon codicon-beaker"></i> test</button>
+          <button type="button" class="icon-btn" id="btn-run-git-status"><i class="codicon codicon-source-control"></i> git status</button>
+          <button type="button" class="icon-btn" id="btn-run-git-diff"><i class="codicon codicon-diff"></i> git diff</button>
         </div>
         <div class="panel-view active" id="panel-terminal">
           <div class="terminal-body" id="terminal-output">Aguardando comandos...</div>
+          <form class="terminal-input-row" id="terminal-form" autocomplete="off">
+            <span class="terminal-prompt">&gt;</span>
+            <input id="terminal-command-input" class="terminal-command-input" type="text" spellcheck="false" placeholder="Digite comando permitido: npm run build, npm run typecheck, npm test, git status, git diff">
+            <button type="submit" class="btn-primary btn-sm" id="btn-terminal-run">Executar</button>
+          </form>
+          <div class="terminal-help">
+            Permitidos: <code>npm run build</code>, <code>npm run typecheck</code>, <code>npm test</code>, <code>git status</code>, <code>git diff</code>, <code>node --version</code>, <code>npm --version</code>.
+          </div>
         </div>
         <div class="panel-view" id="panel-output">
           <div class="output-body" id="output-body"></div>
@@ -240,6 +252,16 @@
     </footer>
   </div>
 
+  <div class="command-palette-overlay" id="command-palette-overlay" aria-hidden="true">
+    <div class="command-palette" role="dialog" aria-modal="true" aria-label="Command Palette">
+      <div class="command-palette-header">
+        <span class="command-palette-prompt">&gt;</span>
+        <input id="command-palette-input" class="command-palette-input" type="text" spellcheck="false" placeholder="Digite um comando...">
+      </div>
+      <div class="command-palette-list" id="command-palette-list"></div>
+    </div>
+  </div>
+
   <script src="/devmind.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.2/min/vs/loader.min.js"></script>
   <script src="/layout.js"></script>
@@ -251,6 +273,7 @@
   <script src="/ai-panel.js"></script>
   <script src="/search.js"></script>
   <script src="/sidebar-panels.js"></script>
+  <script src="/command-palette.js"></script>
   <script src="/app.js"></script>
 </body>
 </html>

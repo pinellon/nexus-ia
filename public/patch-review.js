@@ -229,6 +229,33 @@ function renderPatchActions(patch) {
   `;
 }
 
+function renderPostApplyActions(filePath) {
+  const target = $("#patch-review-actions");
+  if (!target) return;
+  target.innerHTML = `
+    <button class="btn-primary" type="button" onclick="runDevCommand('typecheck')">Rodar typecheck</button>
+    <button class="btn-secondary" type="button" onclick="runDevCommand('build')">Rodar build</button>
+    <button class="btn-secondary" type="button" onclick="activateSideView('git')">Gerar commit</button>
+    ${filePath && filePath.endsWith(".html") ? `<button class="btn-secondary" type="button" onclick="openProjectPreview('${escapeHtml(filePath)}')">Abrir preview</button>` : ""}
+  `;
+}
+
+function showPatchAppliedState(filePath) {
+  $("#patch-review-empty").style.display = "none";
+  $("#patch-review-layout").style.display = "flex";
+  $("#patch-review-header").innerHTML = `
+    <h3 class="patch-review-title">Patch aplicado com sucesso</h3>
+    <div class="patch-review-meta">
+      <div><span>Arquivo</span><br><strong>${escapeHtml(filePath || "-")}</strong></div>
+      <div><span>Proximo passo</span><br><strong>Rodar validacao ou gerar commit</strong></div>
+    </div>
+  `;
+  $("#patch-review-files").innerHTML = "";
+  $("#patch-stale-alert").style.display = "none";
+  disposeDiffModels();
+  renderPostApplyActions(filePath);
+}
+
 async function showPatchDiff(patch, filePath) {
   await ensureMonacoDiff();
   const entry =
@@ -407,28 +434,8 @@ window.togglePatchDiffLayout = async function togglePatchDiffLayout() {
 };
 
 window.runPatchCommand = async function runPatchCommand(commandId) {
-  showBottomPanel("terminal");
-  logTerminal(">> npm run " + commandId);
-  try {
-    const res = await api("/api/commands/run", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ commandId })
-    });
-    const result = res.result || res.data || res;
-    logTerminal(result.stdout || "");
-    logTerminal(result.stderr || "");
-    if (result.exitCode !== 0) {
-      logTerminal("Comando falhou com codigo " + result.exitCode);
-      const btn = `<button class="btn-primary" style="margin-top:10px" onclick="requestAiFixFromPatch('Corrija o erro do ${commandId}')">Corrigir erro com IA</button>`;
-      $("#terminal-output").innerHTML += "<br>" + btn + "<br>";
-    } else {
-      logTerminal(">> Sucesso!");
-      setStatus(commandId + " concluido com sucesso.");
-    }
-  } catch (e) {
-    logTerminal("Erro: " + e.message);
-  }
+  if (typeof runDevCommand === "function") return runDevCommand(commandId);
+  setStatus("Executor de comandos indisponivel.");
 };
 
 window.requestAiFixFromPatch = function requestAiFixFromPatch(prefill) {
@@ -469,8 +476,7 @@ window.applyPatch = async function applyPatch(id) {
     if (filePath) await syncOpenFileAfterPatch(filePath, afterContent);
     state.activePatchId = null;
     state.activePatch = null;
-    disposeDiffModels();
-    showPatchReviewEmpty("Patch aplicado com sucesso.");
+    showPatchAppliedState(filePath);
     await loadPatches();
     if (state.project) await loadFiles(state.project.projectPath);
   } catch (e) {
@@ -478,6 +484,15 @@ window.applyPatch = async function applyPatch(id) {
     if (msg.includes("mudou desde")) showStalePatchAlert();
     setStatus("Erro ao aplicar patch: " + msg);
   }
+};
+
+window.openProjectPreview = function openProjectPreview(filePath) {
+  if (!filePath) return;
+  if (filePath === "public/index.html" || filePath.endsWith("/index.html")) {
+    window.open("/", "_blank", "noopener,noreferrer");
+    return;
+  }
+  window.open(`/api/project/file?path=${encodeURIComponent(filePath)}`, "_blank", "noopener,noreferrer");
 };
 
 window.rejectPatch = async function rejectPatch(id) {
@@ -504,5 +519,9 @@ document.addEventListener("devmind:action", (event) => {
     const patchId = detail.patchId || detail.patchIds?.[0];
     const viewDiff = detail.id === "view_patch_diff" || detail.openDiff === true;
     openPatchesPanel({ patchId, viewDiff: viewDiff || !!patchId });
+  }
+  if (detail.type === "preview" || detail.id === "open_preview") {
+    const url = detail.value || detail.url;
+    if (url) window.open(url, "_blank", "noopener,noreferrer");
   }
 });

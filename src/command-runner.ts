@@ -11,7 +11,9 @@ const COMMANDS = {
   install: { label: "npm install", command: "npm", args: ["install"] },
   "install-dev": { label: "npm install --save-dev", command: "npm", args: ["install", "--save-dev"] },
   "node-version": { label: "node --version", command: "node", args: ["--version"] },
-  "npm-version": { label: "npm --version", command: "npm", args: ["--version"] }
+  "npm-version": { label: "npm --version", command: "npm", args: ["--version"] },
+  "git-status": { label: "git status", command: "git", args: ["status", "--short", "--branch"] },
+  "git-diff": { label: "git diff", command: "git", args: ["diff", "--no-ext-diff"] }
 } as const;
 
 export type AllowedCommandId = keyof typeof COMMANDS;
