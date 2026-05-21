@@ -871,6 +871,56 @@ pre.code-view {
   pointer-events: none;
 }
 
+/* Editor Selection Bar */
+.editor-selection-bar {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 1000;
+  background: var(--vscode-bg);
+  border: 1px solid var(--vscode-border);
+  border-radius: 4px;
+  padding: 4px;
+  display: flex;
+  gap: 4px;
+  max-width: 95%;
+  overflow-x: auto;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.editor-selection-action-btn {
+  padding: 6px 10px;
+  border: 1px solid var(--vscode-border);
+  background: var(--vscode-accent);
+  color: white;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: background-color 0.2s ease;
+}
+
+.editor-selection-action-btn:hover:not(:disabled) {
+  background: var(--vscode-accent-hover);
+}
+
+.editor-selection-action-btn:active:not(:disabled) {
+  opacity: 0.8;
+}
+
+.editor-selection-action-btn:disabled,
+.editor-selection-action-btn[aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.editor-selection-action-btn .codicon {
+  font-size: 14px;
+}
+
 .search-input {
   width: 100%;
   padding: 6px 8px 6px 28px;

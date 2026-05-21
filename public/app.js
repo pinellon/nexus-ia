@@ -389,6 +389,9 @@ function initApp() {
   initExplorer();
   initTerminal();
   initAiPanel();
+  if (typeof EditorSelectionActions !== "undefined") {
+    EditorSelectionActions.init();
+  }
   if (typeof initSearch === "function") initSearch();
   if (typeof initCommandPalette === "function") initCommandPalette();
 
