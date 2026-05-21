@@ -2,10 +2,10 @@ import { mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import request from "supertest";
-import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const dataDir = path.resolve(process.cwd(), ".tmp-tests/patches-api-data");
-const projectRoot = ".tmp-tests/patches-api-project";
+const projectRoot = "workspace/__patches-api-project__";
 const absoluteProjectRoot = path.resolve(process.cwd(), projectRoot);
 
 describe("patches api", () => {
@@ -21,6 +21,10 @@ describe("patches api", () => {
     await mkdir(path.join(absoluteProjectRoot, "src"), { recursive: true });
     await rm(dataDir, { recursive: true, force: true });
     vi.resetModules();
+  });
+
+  afterEach(async () => {
+    await rm(absoluteProjectRoot, { recursive: true, force: true });
   });
 
   it("GET /api/patches/:patchId returns before and after for Monaco diff", async () => {

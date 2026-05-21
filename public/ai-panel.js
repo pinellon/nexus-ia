@@ -4,6 +4,34 @@ function initAiPanel() {
     return $("#dm-input") || $("#devmindChat textarea") || $("#devmindChat input");
   }
 
+  function rememberPreviewUrl(url) {
+    if (!url) return;
+    state.previewUrl = url;
+    const btn = $("#btn-open-preview");
+    if (btn) {
+      btn.classList.add("has-preview");
+      btn.title = "Abrir preview: " + url;
+    }
+  }
+
+  function findPreviewUrl() {
+    if (state.previewUrl) return state.previewUrl;
+    const stagedHtml = (state.stagedFiles || []).find((file) => file.run_id && /(?:^|\/)index\.html$/i.test(file.path));
+    if (stagedHtml?.run_id) return `/preview/staged/${encodeURIComponent(stagedHtml.run_id)}/index.html`;
+    const active = window.NexusIDE?.getActiveFile?.();
+    if (active?.path === "public/index.html" || /\/index\.html$/i.test(active?.path || "")) {
+      return `/api/project/file?projectRoot=${encodeURIComponent(activeProjectRoot())}&path=${encodeURIComponent(active.path)}`;
+    }
+    return "/";
+  }
+
+  function openPreview() {
+    const url = findPreviewUrl();
+    rememberPreviewUrl(url);
+    window.open(url, "_blank", "noopener,noreferrer");
+    setStatus("Preview aberto: " + url);
+  }
+
   function attachContextToChat(label) {
     const input = getChatInput();
     if (!input) return;
@@ -24,6 +52,8 @@ function initAiPanel() {
     attachContextToChat("selecao atual");
   });
 
+  $("#btn-open-preview")?.addEventListener("click", openPreview);
+
   if (window.DevMind) {
     const originalGetContext = buildIDEContext;
     window.DevMind.init({
@@ -42,11 +72,19 @@ function initAiPanel() {
         if (data.run_id && typeof startAgentProgress === "function") {
           startAgentProgress(data.run_id);
         }
-        if (state.project) loadFiles(state.project.projectPath);
-        if (data.patch_ids?.length && typeof loadPatches === "function") {
+        if (state.project) loadFiles(activeProjectRoot());
+        if (data.patch_ids?.length) {
           if (state.agentProgress) mergeAgentPatchIds(data.patch_ids);
-          loadPatches();
-          showBottomPanel("patch");
+          if (typeof openPatchesPanel === "function") {
+            openPatchesPanel({ patchId: data.patch_ids[0], viewDiff: true });
+          } else if (typeof loadPatches === "function") {
+            loadPatches();
+            showBottomPanel("patch");
+          }
+        }
+        if (data.preview_url) {
+          rememberPreviewUrl(data.preview_url);
+          setStatus("Preview pronto. Use o botao Preview no painel Nexus AI.");
         }
         setTimeout(() => {
           if (state.stagedFiles?.length) {
@@ -58,11 +96,4 @@ function initAiPanel() {
     });
   }
 
-  document.addEventListener("devmind:action", (event) => {
-    const detail = event.detail || {};
-    if (detail.value === "patches" || detail.id === "open_patches") {
-      showBottomPanel("patch");
-      if (typeof loadPatches === "function") loadPatches();
-    }
-  });
 }
