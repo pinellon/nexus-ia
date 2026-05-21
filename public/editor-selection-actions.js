@@ -70,7 +70,18 @@
   const state = {
     selectionBar: null,
     currentSelection: null,
-    lastAction: null
+    lastAction: null,
+    history: [], // recent selection actions
+    analytics: {}, // action counts
+    favorites: [],
+    undoStack: []
+  };
+
+  const PERSIST_KEYS = {
+    HISTORY: "esa_history_v1",
+    ANALYTICS: "esa_analytics_v1",
+    FAVORITES: "esa_favorites_v1",
+    UNDO: "esa_undo_v1"
   };
 
   // ── Utilities ──────────────────────────────────────────────────────────────
@@ -131,6 +142,253 @@
       return "Arquivo tem alterações não salvas. Salve antes de pedir ação com patch.";
     }
     return null;
+  }
+
+  // ── Persistence & Helpers ─────────────────────────────────────────────────
+  function saveToStorage(key, value) {
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+    } catch (err) {
+      console.debug("Could not save to storage", key, err.message);
+    }
+  }
+
+  function loadFromStorage(key, fallback) {
+    try {
+      const raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : fallback;
+    } catch (err) {
+      return fallback;
+    }
+  }
+
+  function initPersistentState() {
+    // History (recent selections)
+    state.history = loadFromStorage(PERSIST_KEYS.HISTORY, []);
+    // Analytics
+    state.analytics = loadFromStorage(PERSIST_KEYS.ANALYTICS, {});
+    // Favorites
+    const fav = loadFromStorage(PERSIST_KEYS.FAVORITES, []);
+    state.favorites = Array.isArray(fav) ? fav : [];
+    // Undo stack
+    state.undoStack = loadFromStorage(PERSIST_KEYS.UNDO, []);
+  }
+
+  const ACTION_ORDER = [
+    "explain",
+    "refactor",
+    "fix",
+    "tests",
+    "transform_function",
+    "optimize",
+    "security"
+  ];
+
+  function getActionIdByIndex(n) {
+    return ACTION_ORDER[n - 1] || null;
+  }
+
+  function initKeyboardShortcuts() {
+    document.addEventListener("keydown", (e) => {
+      // Ignore when typing into input/textarea
+      const active = document.activeElement;
+      if (active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA" || active.isContentEditable)) return;
+
+      const isCtrl = e.ctrlKey || e.metaKey;
+      if (!isCtrl) return;
+
+      // Ctrl+1..7 map to actions
+      if (/^[1-7]$/.test(e.key)) {
+        const idx = parseInt(e.key, 10);
+        const actionId = getActionIdByIndex(idx);
+        if (actionId) {
+          const context = getEditorSelectionContext();
+          const info = ACTION_TYPES[actionId];
+          const activeDoc = global.state?.openedFiles?.get(global.state.activePath);
+          if (!context) return;
+          if (!canPerformAction(info, activeDoc)) {
+            const reason = getBlockingReason(info, activeDoc);
+            alert(reason || "Ação não disponível");
+            return;
+          }
+          e.preventDefault();
+          handleActionClick(actionId);
+        }
+      }
+    });
+  }
+
+  function addToHistory(selectionContext, actionId) {
+    try {
+      const item = {
+        actionId,
+        filePath: selectionContext.filePath,
+        language: selectionContext.language,
+        lines: `${selectionContext.startLine}-${selectionContext.endLine}`,
+        snippet: selectionContext.selectedText.slice(0, 300),
+        timestamp: Date.now()
+      };
+
+      state.history.unshift(item);
+      if (state.history.length > 50) state.history.length = 50;
+      saveToStorage(PERSIST_KEYS.HISTORY, state.history);
+    } catch (err) {
+      console.debug("addToHistory error", err.message);
+    }
+  }
+
+  function recordAnalytics(actionId) {
+    state.analytics[actionId] = (state.analytics[actionId] || 0) + 1;
+    saveToStorage(PERSIST_KEYS.ANALYTICS, state.analytics);
+  }
+
+  function undoLast() {
+    if (!state.undoStack || state.undoStack.length === 0) {
+      alert("Nenhuma alteração para desfazer");
+      return;
+    }
+    const last = state.undoStack.pop();
+    saveToStorage(PERSIST_KEYS.UNDO, state.undoStack);
+
+    // Restore in editor if matching file is open
+    const activeDoc = global.state?.openedFiles?.get(global.state.activePath);
+    if (activeDoc && activeDoc.path === last.filePath && global.state.editor) {
+      try {
+        global.state.editor.setValue(last.prevContent || "");
+        alert("Alteração desfeita (conteúdo restaurado)");
+      } catch (err) {
+        console.debug("undo apply error", err.message);
+      }
+    } else {
+      alert("Arquivo para desfazer não está aberto no editor");
+    }
+  }
+
+  function createModal(title, bodyHtml, buttons = []) {
+    const overlay = document.createElement("div");
+    overlay.className = "esa-modal-overlay";
+    overlay.innerHTML = `
+      <div class="esa-modal">
+        <div class="esa-modal-header"><strong>${esc(title)}</strong><button class="esa-modal-close" aria-label="Fechar">×</button></div>
+        <div class="esa-modal-body">${bodyHtml}</div>
+        <div class="esa-modal-actions"></div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    overlay.querySelector(".esa-modal-close").addEventListener("click", () => overlay.remove());
+    const actionsEl = overlay.querySelector(".esa-modal-actions");
+    buttons.forEach((b) => {
+      const btn = document.createElement("button");
+      btn.className = b.className || "btn-primary";
+      btn.textContent = b.label;
+      btn.addEventListener("click", () => {
+        try { b.onClick(); } catch (err) { console.debug("modal button error", err.message); }
+        overlay.remove();
+      });
+      actionsEl.appendChild(btn);
+    });
+
+    return overlay;
+  }
+
+  function showHistoryModal() {
+    const rows = state.history.map((h) => {
+      const t = new Date(h.timestamp).toLocaleString();
+      const label = ACTION_TYPES[h.actionId]?.label || h.actionId;
+      return `<div class="card"><div style="display:flex;justify-content:space-between;"><strong>${esc(label)}</strong><span style="color:var(--vscode-muted);font-size:11px">${esc(h.filePath)}:${esc(h.lines)}</span></div><pre class="code-view">${esc(h.snippet)}</pre><div style="font-size:11px;color:var(--vscode-muted);margin-top:6px">${t}</div></div>`;
+    }).join("");
+
+    createModal("Histórico de ações", rows || '<div class="empty-state">Nenhuma ação ainda</div>', []);
+  }
+
+  function showAnalyticsModal() {
+    const rows = Object.entries(state.analytics).map(([k, v]) => `<div style="display:flex;justify-content:space-between;padding:6px 0"><div>${esc(ACTION_TYPES[k]?.label||k)}</div><div style="font-weight:700">${v}</div></div>`).join("");
+    createModal("Estatísticas de uso", rows || '<div class="empty-state">Sem dados</div>', []);
+  }
+
+  function confirmPatchAction(actionId, selectionContext, actionInfo) {
+    return new Promise((resolve) => {
+      if (!actionInfo.generatesPatch) return resolve(true);
+      const body = `<div><p>Esta ação pode gerar um patch que modifica arquivos. Deseja continuar?</p><div style=\"margin-top:8px;max-height:220px;overflow:auto;border:1px solid var(--vscode-border-subtle);padding:8px;background:var(--vscode-bg);\"><pre class=\"code-view\">${esc(selectionContext.selectedText)}</pre></div></div>`;
+      createModal(`Confirmar: ${actionInfo.label}`, body, [
+        { label: "Cancelar", className: "btn-secondary", onClick: () => resolve(false) },
+        { label: "Continuar", className: "btn-primary", onClick: () => resolve(true) }
+      ]);
+    });
+  }
+
+  function toggleFavorite(actionId) {
+    const idx = state.favorites.indexOf(actionId);
+    if (idx === -1) {
+      state.favorites.unshift(actionId);
+    } else {
+      state.favorites.splice(idx, 1);
+    }
+    saveToStorage(PERSIST_KEYS.FAVORITES, state.favorites);
+    renderSelectionBar();
+  }
+
+  function showReorderModal() {
+    if (!Array.isArray(state.favorites) || state.favorites.length === 0) {
+      createModal('Reordenar Favoritos', '<div class="empty-state">Nenhuma ação favoritada</div>', []);
+      return;
+    }
+
+    const overlay = createModal('Reordenar Favoritos', '', [
+      { label: 'Salvar', className: 'btn-primary', onClick: () => {
+          const rows = overlay.querySelectorAll('.esa-reorder-row');
+          const newOrder = Array.from(rows).map(r => r.dataset.action);
+          state.favorites = newOrder;
+          saveToStorage(PERSIST_KEYS.FAVORITES, state.favorites);
+          renderSelectionBar();
+        } },
+      { label: 'Fechar', className: 'btn-secondary', onClick: () => {} }
+    ]);
+
+    function renderBody() {
+      const bodyHtml = state.favorites.map((aid) => {
+        const label = ACTION_TYPES[aid]?.label || aid;
+        return `<div class="esa-reorder-row" data-action="${esc(aid)}" style="display:flex;align-items:center;justify-content:space-between;padding:6px 0"><div style="display:flex;align-items:center;gap:8px"><span style="cursor:grab">⋮</span><strong>${esc(label)}</strong></div><div><button class="esa-up btn-ghost" data-action="${esc(aid)}">▲</button><button class="esa-down btn-ghost" data-action="${esc(aid)}">▼</button><button class="esa-remove btn-ghost" data-action="${esc(aid)}">Remover</button></div></div>`;
+      }).join('');
+      overlay.querySelector('.esa-modal-body').innerHTML = bodyHtml;
+
+      overlay.querySelectorAll('.esa-up').forEach(btn => btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const aid = btn.dataset.action;
+        const i = state.favorites.indexOf(aid);
+        if (i > 0) { state.favorites.splice(i, 1); state.favorites.splice(i - 1, 0, aid); }
+        renderBody();
+      }));
+
+      overlay.querySelectorAll('.esa-down').forEach(btn => btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const aid = btn.dataset.action;
+        const i = state.favorites.indexOf(aid);
+        if (i >= 0 && i < state.favorites.length - 1) { state.favorites.splice(i, 1); state.favorites.splice(i + 1, 0, aid); }
+        renderBody();
+      }));
+
+      overlay.querySelectorAll('.esa-remove').forEach(btn => btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        const aid = btn.dataset.action;
+        const i = state.favorites.indexOf(aid);
+        if (i >= 0) { state.favorites.splice(i, 1); }
+        renderBody();
+      }));
+    }
+
+    renderBody();
+  }
+
+  // Debounced render to avoid flicker while selecting
+  function debouncedRenderSelectionBar(delay = 180) {
+    try {
+      if (state.selectionDebounceTimer) clearTimeout(state.selectionDebounceTimer);
+      state.selectionDebounceTimer = setTimeout(() => {
+        renderSelectionBar();
+      }, delay);
+    } catch (err) { console.debug('debounce error', err.message); }
   }
 
   // ── Get Selection Context ──────────────────────────────────────────────────
@@ -352,7 +610,41 @@ Reporte problemas e sugira patches se aplicável.`
       })
       .join("");
 
-    // Attach event listeners
+    // Reorder actions: favorited actions first (preserve user order)
+    const allIds = Object.keys(ACTION_TYPES);
+    const favoriteIds = Array.isArray(state.favorites) ? state.favorites.filter(id => allIds.includes(id)) : [];
+    const remainingIds = allIds.filter(id => !favoriteIds.includes(id));
+    const orderedIds = [...favoriteIds, ...remainingIds];
+
+    bar.innerHTML = orderedIds.map((actionId) => {
+      const actionInfo = ACTION_TYPES[actionId];
+      const canDo = canPerformAction(actionInfo, activeDoc);
+      const blockingReason = getBlockingReason(actionInfo, activeDoc);
+      const disabled = !canDo;
+      const title = blockingReason || actionInfo.description;
+      const ariaDisabled = disabled ? "true" : "false";
+      const isFav = favoriteIds.includes(actionId);
+
+      return `
+        <div class="esa-action-wrap" style="display:inline-flex;align-items:center;gap:6px">
+          <button 
+            type="button"
+            class="editor-selection-action-btn${disabled ? ' disabled' : ''}"
+            data-action="${esc(actionId)}"
+            title="${esc(title)}"
+            aria-disabled="${ariaDisabled}"
+            style="padding:6px 10px;border:1px solid var(--vscode-button-border, transparent);background:var(--vscode-button-background, #007acc);color:var(--vscode-button-foreground, white);border-radius:3px;cursor:${disabled ? 'not-allowed' : 'pointer'};opacity:${disabled ? 0.5 : 1};font-size:12px;white-space:nowrap;display:flex;align-items:center;gap:4px;"
+            ${disabled ? 'disabled' : ''}
+          >
+            <i class="codicon ${esc(actionInfo.icon)}" style="font-size:14px;"></i>
+            <span>${esc(actionInfo.label)}</span>
+          </button>
+          <button class="esa-fav-toggle" data-fav="${esc(actionId)}" title="${isFav ? 'Remover favorito' : 'Favoritar'}" style="background:transparent;border:none;color:var(--vscode-yellow);font-size:14px;cursor:pointer;padding:2px 6px">${isFav ? '★' : '☆'}</button>
+        </div>
+      `;
+    }).join("");
+
+    // Attach event listeners for action buttons
     bar.querySelectorAll("[data-action]").forEach((btn) => {
       btn.addEventListener("click", (e) => {
         const actionId = btn.dataset.action;
@@ -364,6 +656,42 @@ Reporte problemas e sugira patches se aplicável.`
         handleActionClick(actionId);
       });
     });
+
+    // Favorite toggle handlers (prevent triggering action click)
+    bar.querySelectorAll('.esa-fav-toggle').forEach((fbtn) => {
+      fbtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const aid = fbtn.dataset.fav;
+        toggleFavorite(aid);
+      });
+    });
+
+    // Add utility buttons: history, analytics, undo
+    const extras = document.createElement('div');
+    extras.style.cssText = 'display:flex;align-items:center;gap:6px;padding-left:8px;border-left:1px solid rgba(255,255,255,0.03);margin-left:8px';
+    extras.innerHTML = `
+      <button id="esa-history-btn" class="btn-ghost" title="Histórico">Histórico</button>
+      <button id="esa-analytics-btn" class="btn-ghost" title="Estatísticas">Estatísticas</button>
+      <button id="esa-reorder-btn" class="btn-ghost" title="Reordenar favoritos">Reordenar</button>
+      <button id="esa-undo-btn" class="btn-ghost" title="Desfazer última alteração">Desfazer</button>
+    `;
+
+    // Remove previous extras if present
+    const existingExtras = bar.querySelector('.esa-extras');
+    if (existingExtras) existingExtras.remove();
+    extras.className = 'esa-extras';
+    bar.appendChild(extras);
+
+    // Wire extra buttons
+    const histBtn = bar.querySelector('#esa-history-btn');
+    const statsBtn = bar.querySelector('#esa-analytics-btn');
+    const undoBtn = bar.querySelector('#esa-undo-btn');
+    if (histBtn) histBtn.addEventListener('click', (e) => { e.preventDefault(); showHistoryModal(); });
+    if (statsBtn) statsBtn.addEventListener('click', (e) => { e.preventDefault(); showAnalyticsModal(); });
+    const reorderBtn = bar.querySelector('#esa-reorder-btn');
+    if (reorderBtn) reorderBtn.addEventListener('click', (e) => { e.preventDefault(); showReorderModal(); });
+    if (undoBtn) undoBtn.addEventListener('click', (e) => { e.preventDefault(); undoLast(); });
 
     // Attach to editor container if not already attached
     const editorContainer = document.getElementById("monaco-editor");
@@ -383,7 +711,7 @@ Reporte problemas e sugira patches se aplicável.`
   }
 
   // ── Action Handler ────────────────────────────────────────────────────────
-  function handleActionClick(actionId) {
+  async function handleActionClick(actionId) {
     const context = getEditorSelectionContext();
     if (!context) {
       console.warn("No selection context available");
@@ -402,6 +730,24 @@ Reporte problemas e sugira patches se aplicável.`
       alert(reason || "Esta ação não pode ser realizada agora");
       return;
     }
+
+    // Confirm for patch-generating actions
+    const ok = await confirmPatchAction(actionId, context, actionInfo);
+    if (!ok) return;
+
+    // Record history and analytics
+    try { addToHistory(context, actionId); } catch (err) { console.debug(err); }
+    try { recordAnalytics(actionId); } catch (err) { console.debug(err); }
+
+    // Save undo snapshot for patch actions
+    try {
+      if (actionInfo.generatesPatch && global.state?.editor) {
+        const prev = global.state.editor.getValue?.() || "";
+        state.undoStack.push({ filePath: context.filePath, prevContent: prev });
+        if (state.undoStack.length > 20) state.undoStack.shift();
+        saveToStorage(PERSIST_KEYS.UNDO, state.undoStack);
+      }
+    } catch (err) { console.debug("undo save error", err.message); }
 
     state.lastAction = {
       type: actionId,
@@ -494,9 +840,9 @@ Reporte problemas e sugira patches se aplicável.`
 
     const editor = global.state.editor;
 
-    // Update bar when selection changes
+    // Update bar when selection changes (debounced)
     editor.onDidChangeCursorSelection?.((e) => {
-      renderSelectionBar();
+      debouncedRenderSelectionBar();
     });
 
     // Hide bar when editor loses focus
@@ -506,7 +852,7 @@ Reporte problemas e sugira patches se aplicável.`
 
     // Show bar when editor gains focus if there's a selection
     editor.onDidFocusEditorText?.(() => {
-      renderSelectionBar();
+      debouncedRenderSelectionBar();
     });
 
     // Listen to Monaco Editor context menu (if API available)
@@ -587,10 +933,18 @@ Reporte problemas e sugira patches se aplicável.`
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", () => {
       if (global.state && global.state.editor) {
+        initPersistentState();
+        initKeyboardShortcuts();
         initSelectionMonitoring();
+      } else {
+        // still initialize persistent bits
+        initPersistentState();
+        initKeyboardShortcuts();
       }
     });
   } else if (global.state && global.state.editor) {
+    initPersistentState();
+    initKeyboardShortcuts();
     initSelectionMonitoring();
   }
 

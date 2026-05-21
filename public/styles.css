@@ -798,6 +798,40 @@ pre.code-view {
 /* Welcome screen */
 .editor-welcome {
   position: absolute;
+}
+
+/* Editor Selection Actions - extras */
+.esa-extras { display: flex; align-items: center; gap: 6px; }
+.esa-extras .btn-ghost { font-size: 12px; padding: 4px 8px; }
+
+/* Modal for confirmations, history and analytics */
+.esa-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+.esa-modal {
+  width: min(880px, 96%);
+  max-height: 80vh;
+  overflow: auto;
+  background: var(--vscode-bg);
+  border: 1px solid var(--vscode-border);
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+}
+.esa-modal-header { display:flex; align-items:center; justify-content:space-between; padding:10px 12px; border-bottom:1px solid var(--vscode-border-subtle); }
+.esa-modal-body { padding: 12px; max-height: 60vh; overflow: auto; }
+.esa-modal-actions { padding: 10px 12px; display:flex; gap:8px; justify-content:flex-end; border-top:1px solid var(--vscode-border-subtle); }
+
+/* Favorite toggle */
+.esa-fav-toggle { font-size: 14px; color: var(--vscode-yellow); background: transparent; border: none; padding: 2px 6px; cursor: pointer; }
+.esa-fav-toggle:hover { transform: scale(1.05); }
+
+
   inset: 0;
   z-index: 2;
   display: flex;
