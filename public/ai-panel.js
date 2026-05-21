@@ -4,6 +4,32 @@ function initAiPanel() {
     return $("#dm-input") || $("#devmindChat textarea") || $("#devmindChat input");
   }
 
+  function rememberPreviewUrl(url) {
+    if (!url) return;
+    state.previewUrl = url;
+    const btn = $("#btn-open-preview");
+    if (btn) {
+      btn.classList.add("has-preview");
+      btn.title = "Abrir preview: " + url;
+    }
+  }
+
+  function findPreviewUrl() {
+    if (state.previewUrl) return state.previewUrl;
+    const stagedHtml = (state.stagedFiles || []).find((file) => file.run_id && /(?:^|\/)index\.html$/i.test(file.path));
+    if (stagedHtml?.run_id) return `/preview/staged/${encodeURIComponent(stagedHtml.run_id)}/index.html`;
+    const active = window.NexusIDE?.getActiveFile?.();
+    if (active?.path === "public/index.html" || /\/index\.html$/i.test(active?.path || "")) return "/";
+    return "/";
+  }
+
+  function openPreview() {
+    const url = findPreviewUrl();
+    rememberPreviewUrl(url);
+    window.open(url, "_blank", "noopener,noreferrer");
+    setStatus("Preview aberto: " + url);
+  }
+
   function attachContextToChat(label) {
     const input = getChatInput();
     if (!input) return;
@@ -23,6 +49,8 @@ function initAiPanel() {
   $("#btn-use-selection-context")?.addEventListener("click", () => {
     attachContextToChat("selecao atual");
   });
+
+  $("#btn-open-preview")?.addEventListener("click", openPreview);
 
   if (window.DevMind) {
     const originalGetContext = buildIDEContext;
@@ -53,7 +81,8 @@ function initAiPanel() {
           }
         }
         if (data.preview_url) {
-          setStatus("Preview pronto. Use o botao Abrir preview no chat.");
+          rememberPreviewUrl(data.preview_url);
+          setStatus("Preview pronto. Use o botao Preview no painel Nexus AI.");
         }
         setTimeout(() => {
           if (state.stagedFiles?.length) {

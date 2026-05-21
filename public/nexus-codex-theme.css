@@ -801,6 +801,12 @@ body {
   text-align: center;
 }
 
+#btn-open-preview.has-preview {
+  border-color: var(--amber-dim);
+  background: var(--amber-glow);
+  color: var(--amber);
+}
+
 .problem-title {
   color: var(--amber);
   font-weight: 700;
