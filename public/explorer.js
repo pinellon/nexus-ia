@@ -25,6 +25,83 @@ function isPathInsideFolder(filePath, folderPath) {
   return filePath === folderPath || filePath.startsWith(folderPath + "/");
 }
 
+function ensureExplorerPrompt() {
+  let overlay = $("#explorer-prompt-overlay");
+  if (overlay) return overlay;
+  overlay = document.createElement("div");
+  overlay.id = "explorer-prompt-overlay";
+  overlay.className = "explorer-prompt-overlay";
+  overlay.innerHTML = `
+    <form class="explorer-prompt-card" id="explorer-prompt-form">
+      <h3 id="explorer-prompt-title">Novo item</h3>
+      <p id="explorer-prompt-help">Informe o caminho dentro do projeto.</p>
+      <input id="explorer-prompt-input" class="explorer-prompt-input" type="text" spellcheck="false">
+      <div class="explorer-prompt-actions">
+        <button type="button" class="btn-secondary" id="explorer-prompt-cancel">Cancelar</button>
+        <button type="submit" class="btn-primary" id="explorer-prompt-confirm">Confirmar</button>
+      </div>
+    </form>
+  `;
+  document.body.appendChild(overlay);
+  return overlay;
+}
+
+function askExplorerPath({ title, help, value = "", confirmLabel = "Confirmar" }) {
+  const overlay = ensureExplorerPrompt();
+  const form = $("#explorer-prompt-form");
+  const input = $("#explorer-prompt-input");
+  $("#explorer-prompt-title").textContent = title;
+  $("#explorer-prompt-help").textContent = help;
+  $("#explorer-prompt-confirm").textContent = confirmLabel;
+  input.value = value;
+  overlay.classList.add("open");
+  overlay.setAttribute("aria-hidden", "false");
+  setTimeout(() => {
+    input.focus();
+    input.select();
+  }, 0);
+
+  return new Promise((resolve) => {
+    const close = (result) => {
+      overlay.classList.remove("open");
+      overlay.setAttribute("aria-hidden", "true");
+      form.removeEventListener("submit", onSubmit);
+      $("#explorer-prompt-cancel").removeEventListener("click", onCancel);
+      overlay.removeEventListener("click", onOverlayClick);
+      document.removeEventListener("keydown", onKeydown);
+      resolve(result);
+    };
+    const onSubmit = (event) => {
+      event.preventDefault();
+      close(input.value.trim());
+    };
+    const onCancel = () => close("");
+    const onOverlayClick = (event) => {
+      if (event.target === overlay) close("");
+    };
+    const onKeydown = (event) => {
+      if (event.key === "Escape") close("");
+    };
+    form.addEventListener("submit", onSubmit);
+    $("#explorer-prompt-cancel").addEventListener("click", onCancel);
+    overlay.addEventListener("click", onOverlayClick);
+    document.addEventListener("keydown", onKeydown);
+  });
+}
+
+async function refreshExplorerTree() {
+  try {
+    if (!state.project?.projectPath) {
+      await loadHealth();
+    } else {
+      await loadFiles(state.project.projectPath);
+    }
+    setStatus("Explorer atualizado");
+  } catch (error) {
+    setStatus("Erro ao atualizar Explorer: " + error.message);
+  }
+}
+
 function renderFileTree() {
   const tree = $("#fileTree");
   if (!tree) return;
@@ -86,7 +163,11 @@ function renderFileTree() {
 }
 
 async function createProjectFile() {
-  const filePath = prompt("Novo arquivo (ex: src/example.ts):");
+  const filePath = await askExplorerPath({
+    title: "Novo arquivo",
+    help: "Exemplo: src/example.ts",
+    confirmLabel: "Criar arquivo"
+  });
   if (!filePath) return;
   try {
     await api("/api/project/file", {
@@ -104,7 +185,11 @@ async function createProjectFile() {
 }
 
 async function createProjectFolderFromPrompt() {
-  const folderPath = prompt("Nova pasta (ex: src/components):");
+  const folderPath = await askExplorerPath({
+    title: "Nova pasta",
+    help: "Exemplo: src/components",
+    confirmLabel: "Criar pasta"
+  });
   if (!folderPath) return;
   try {
     await api("/api/project/folder", {
@@ -121,7 +206,12 @@ async function createProjectFolderFromPrompt() {
 }
 
 async function renameTreePath(oldPath) {
-  const newPath = prompt("Novo caminho:", oldPath);
+  const newPath = await askExplorerPath({
+    title: "Renomear",
+    help: "Informe o novo caminho dentro do projeto.",
+    value: oldPath,
+    confirmLabel: "Renomear"
+  });
   if (!newPath || newPath === oldPath) return;
   try {
     await api("/api/project/rename", {
@@ -194,7 +284,7 @@ async function deleteTreePath(targetPath, type) {
 }
 
 function initExplorer() {
-  $("#btn-refresh-tree")?.addEventListener("click", () => state.project && loadFiles(state.project.projectPath));
+  $("#btn-refresh-tree")?.addEventListener("click", refreshExplorerTree);
   $("#btn-new-file")?.addEventListener("click", createProjectFile);
   $("#btn-new-folder")?.addEventListener("click", createProjectFolderFromPrompt);
 }
