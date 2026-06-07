@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="{{meta_description}}" />
+    <title>{{title}}</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      :root {
+        --bg: #050507;
+        --surface: #0d0d12;
+        --accent: #00d4ff;
+        --accent2: #7c3aed;
+        --text: #f0f0f5;
+        --muted: #8b8ba7;
+        --border: #1a1a2e;
+        --radius: 16px;
+      }
+      body {
+        font-family: 'Inter', sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        line-height: 1.6;
+        overflow-x: hidden;
+      }
+      /* NAV */
+      nav {
+        position: fixed;
+        top: 0;
+        width: 100%;
+        z-index: 100;
+        background: rgba(5, 5, 7, 0.8);
+        backdrop-filter: blur(12px);
+        border-bottom: 1px solid var(--border);
+        padding: 1rem 2rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .nav-logo {
+        font-weight: 900;
+        font-size: 1.2rem;
+        background: linear-gradient(135deg, var(--accent), var(--accent2));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+      .nav-links a {
+        color: var(--muted);
+        text-decoration: none;
+        margin-left: 2rem;
+        transition: color 0.2s;
+      }
+      .nav-links a:hover {
+        color: var(--text);
+      }
+      /* HERO */
+      .hero {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 6rem 2rem 4rem;
+        position: relative;
+      }
+      .hero::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(ellipse at 50% 0%, rgba(0, 212, 255, 0.12), transparent 70%);
+        pointer-events: none;
+      }
+      .hero-badge {
+        display: inline-block;
+        background: rgba(0, 212, 255, 0.1);
+        border: 1px solid rgba(0, 212, 255, 0.3);
+        color: var(--accent);
+        padding: 0.4rem 1rem;
+        border-radius: 99px;
+        font-size: 0.85rem;
+        margin-bottom: 1.5rem;
+      }
+      .hero h1 {
+        font-size: clamp(2.5rem, 6vw, 5rem);
+        font-weight: 900;
+        letter-spacing: -2px;
+        line-height: 1.1;
+        margin-bottom: 1.5rem;
+      }
+      .hero h1 span {
+        background: linear-gradient(135deg, var(--accent), var(--accent2));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+      .hero p {
+        color: var(--muted);
+        font-size: 1.15rem;
+        max-width: 540px;
+        margin: 0 auto 2.5rem;
+      }
+      .hero-btns {
+        display: flex;
+        gap: 1rem;
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+      .btn-primary {
+        background: linear-gradient(135deg, var(--accent), var(--accent2));
+        color: #fff;
+        padding: 0.75rem 2rem;
+        border-radius: 8px;
+        text-decoration: none;
+        font-weight: 700;
+        transition: opacity 0.2s;
+      }
+      .btn-primary:hover {
+        opacity: 0.85;
+      }
+      .btn-ghost {
+        border: 1px solid var(--border);
+        color: var(--text);
+        padding: 0.75rem 2rem;
+        border-radius: 8px;
+        text-decoration: none;
+        font-weight: 600;
+        transition: border-color 0.2s;
+      }
+      .btn-ghost:hover {
+        border-color: var(--accent);
+      }
+      /* PROJECTS */
+      .section {
+        max-width: 1100px;
+        margin: 6rem auto;
+        padding: 0 2rem;
+      }
+      .section-tag {
+        color: var(--accent);
+        font-size: 0.85rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        margin-bottom: 0.75rem;
+      }
+      .section h2 {
+        font-size: 2.2rem;
+        font-weight: 800;
+        letter-spacing: -0.5px;
+        margin-bottom: 3rem;
+      }
+      .projects-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+        gap: 1.5rem;
+      }
+      .project-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 2rem;
+        transition:
+          border-color 0.2s,
+          transform 0.2s;
+      }
+      .project-card:hover {
+        border-color: var(--accent);
+        transform: translateY(-4px);
+      }
+      .project-card h3 {
+        font-size: 1.15rem;
+        font-weight: 700;
+        margin-bottom: 0.6rem;
+      }
+      .project-card p {
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+      .project-tags {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        margin-top: 1.2rem;
+      }
+      .project-tag {
+        background: rgba(124, 58, 237, 0.15);
+        color: #a78bfa;
+        padding: 0.2rem 0.7rem;
+        border-radius: 99px;
+        font-size: 0.75rem;
+        font-weight: 600;
+      }
+      /* CONTACT */
+      .contact {
+        text-align: center;
+        padding: 6rem 2rem;
+        background: linear-gradient(135deg, rgba(0, 212, 255, 0.05), rgba(124, 58, 237, 0.05));
+        border-top: 1px solid var(--border);
+      }
+      .contact h2 {
+        font-size: 2rem;
+        font-weight: 800;
+        margin-bottom: 1rem;
+      }
+      .contact p {
+        color: var(--muted);
+        margin-bottom: 2rem;
+      }
+      footer {
+        padding: 2rem;
+        text-align: center;
+        color: var(--muted);
+        font-size: 0.85rem;
+        border-top: 1px solid var(--border);
+      }
+    </style>
+  </head>
+  <body>
+    <nav>
+      <span class="nav-logo">{{name}}</span>
+      <div class="nav-links">
+        <a href="#projects">Projetos</a>
+        <a href="#about">Sobre</a>
+        <a href="#contact">Contato</a>
+      </div>
+    </nav>
+
+    <section class="hero">
+      <div>
+        <span class="hero-badge">{{badge}}</span>
+        <h1>{{headline}}<br /><span>{{headline_accent}}</span></h1>
+        <p>{{subheadline}}</p>
+        <div class="hero-btns">
+          <a href="#projects" class="btn-primary">{{cta}}</a>
+          <a href="#contact" class="btn-ghost">Contato</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="projects">
+      <p class="section-tag">Portfólio</p>
+      <h2>Projetos em Destaque</h2>
+      <div class="projects-grid">{{projects}}</div>
+    </section>
+
+    <section class="contact" id="contact">
+      <h2>{{contact_headline}}</h2>
+      <p>{{contact_subheadline}}</p>
+      <a href="mailto:{{email}}" class="btn-primary">{{contact_cta}}</a>
+    </section>
+
+    <footer>
+      <p>{{footer_text}}</p>
+    </footer>
+  </body>
+</html>

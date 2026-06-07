@@ -1,0 +1,39 @@
+{
+  "model": {
+    "hidden_size": 256,
+    "num_layers": 4,
+    "num_heads": 4,
+    "dim_ff": 1024,
+    "vocab_size": 12000,
+    "max_seq_len": 512
+  },
+  "training": {
+    "batch_size": 8,
+    "micro_batch_size": 2,
+    "gradient_accumulation_steps": 4,
+    "epochs": 5,
+    "learning_rate": 0.0001,
+    "warmup_steps": 20,
+    "checkpoint_interval": 0,
+    "mixed_precision": true,
+    "use_cpu_fallback": true,
+    "early_stop": {
+      "window": 0,
+      "threshold": 0.0
+    }
+  },
+  "paths": {
+    "raw_data": "../data/raw",
+    "clean_data": "../data/gold",
+    "token_dir": "../data/tokens_instruct_fullstack",
+    "model_dir": "../models/v1_gold379_candidate",
+    "memory_file": "../memory/memory.db",
+    "log_dir": "../logs",
+    "project_root": "../projects"
+  },
+  "safety": {
+    "dangerous_commands": ["del", "rm -rf", "shutdown", "format", "reg delete"],
+    "confirm_prompt": true,
+    "allowed_project_path": "C:/nexus ai/NexusAI/projects"
+  }
+}

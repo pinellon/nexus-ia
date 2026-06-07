@@ -6,17 +6,21 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "vitest run",
+    "test": "vitest run --no-file-parallelism",
     "test:watch": "vitest",
     "test:smoke": "node -e \"console.log('No smoke tests configured yet.')\"",
     "ci": "npm run typecheck && npm run build && npm test",
-    "start": "node dist/server.js",
+    "start": "node dist/src/server.js",
     "build": "tsc -p tsconfig.json",
     "desktop:dev": "node scripts/desktop-dev.mjs",
-    "desktop:build": "node scripts/desktop-build.mjs"
+    "desktop:build": "node scripts/desktop-build.mjs",
+    "lint": "eslint . --ext .ts,.tsx,.js",
+    "format:check": "prettier --check ."
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.57.0",
+    "@types/archiver": "^7.0.0",
+    "archiver": "^8.0.0",
     "cors": "^2.8.5",
     "express": "^5.1.0",
     "express-rate-limit": "^8.5.2"
@@ -24,8 +28,13 @@
   "devDependencies": {
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.3",
-    "@types/node": "^24.10.1",
+    "@types/node": "^24.13.1",
     "@types/supertest": "^7.2.0",
+    "@typescript-eslint/eslint-plugin": "^8.60.1",
+    "@typescript-eslint/parser": "^8.60.1",
+    "eslint": "^8.57.1",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.8.3",
     "supertest": "^7.2.2",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3",

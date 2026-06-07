@@ -1,12 +1,13 @@
-import type { ActionRecord } from "./action-types.js";
-import { projectFileExists, readProjectFile } from "./project-file-store.js";
+import type { ActionRecord } from './action-types.js';
+import { projectFileExists, readProjectFile } from './project-file-store.js';
+import { hashFileContent } from './file-content-hash.js';
 
 export function isPatchAction(action: ActionRecord) {
   return (
-    action.type === "create_file" ||
-    action.type === "write_file" ||
-    action.type === "patch_file" ||
-    action.type === "delete_file"
+    action.type === 'create_file' ||
+    action.type === 'write_file' ||
+    action.type === 'patch_file' ||
+    action.type === 'delete_file'
   );
 }
 
@@ -16,49 +17,49 @@ export function buildUnifiedDiff(before: string, after: string, filePath: string
   return [
     `--- a/${filePath}`,
     `+++ b/${filePath}`,
-    "@@",
+    '@@',
     ...beforeLines.map((line) => `-${line}`),
-    ...afterLines.map((line) => `+${line}`)
-  ].join("\n");
+    ...afterLines.map((line) => `+${line}`),
+  ].join('\n');
 }
 
 export async function resolvePatchSides(action: ActionRecord) {
-  const projectRoot = action.projectRoot ?? ".";
-  const filePath = "path" in action ? action.path : "";
+  const projectRoot = action.projectRoot ?? '.';
+  const filePath = 'path' in action ? action.path : '';
 
   switch (action.type) {
-    case "create_file":
-      return { path: filePath, before: "", after: action.content };
-    case "write_file": {
-      let before = "";
+    case 'create_file':
+      return { path: filePath, before: '', after: action.content };
+    case 'write_file': {
+      let before = '';
       if (filePath) {
         try {
           if (await projectFileExists(projectRoot, filePath)) {
             before = (await readProjectFile(projectRoot, filePath)).content;
           }
         } catch {
-          before = "";
+          before = '';
         }
       }
       return { path: filePath, before, after: action.content };
     }
-    case "patch_file":
+    case 'patch_file':
       return { path: filePath, before: action.before, after: action.after };
-    case "delete_file": {
-      let before = "";
+    case 'delete_file': {
+      let before = '';
       if (filePath) {
         try {
           if (await projectFileExists(projectRoot, filePath)) {
             before = (await readProjectFile(projectRoot, filePath)).content;
           }
         } catch {
-          before = "";
+          before = '';
         }
       }
-      return { path: filePath, before, after: "" };
+      return { path: filePath, before, after: '' };
     }
     default:
-      return { path: filePath, before: "", after: "" };
+      return { path: filePath, before: '', after: '' };
   }
 }
 
@@ -71,18 +72,20 @@ export async function buildPatchPayload(action: ActionRecord) {
     type: action.type,
     path: filePath,
     run_id: action.sessionId,
-    agent_id: action.sourceAgent || "unknown",
-    goal: action.goal || "",
+    agent_id: action.sourceAgent || 'unknown',
+    goal: action.goal || '',
     files_changed: filesChanged,
     risk: action.riskLevel,
     status: action.status,
     summary: action.reason,
     created_at: action.createdAt,
     updated_at: action.updatedAt,
-    diff: buildUnifiedDiff(before, after, filePath || "file"),
+    diff: buildUnifiedDiff(before, after, filePath || 'file'),
     before,
     after,
-    content: action.type === "create_file" || action.type === "write_file" ? action.content : after,
-    action
+    expected_hash:
+      action.type === 'write_file' ? action.expectedHash || hashFileContent(before) : undefined,
+    content: action.type === 'create_file' || action.type === 'write_file' ? action.content : after,
+    action,
   };
 }

@@ -1,5 +1,5 @@
 /* Nexus Codex — visual theme (merged from Nexus Codex UI mockup) */
-@import url("https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=DM+Sans:wght@300;400;500;600&display=swap");
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=DM+Sans:wght@300;400;500;600&display=swap');
 
 :root {
   --bg0: #090a0d;
@@ -45,8 +45,8 @@
   --vscode-red: var(--red-nx);
   --vscode-yellow: var(--amber);
   --vscode-badge: var(--bg3);
-  --font-ui: "DM Sans", system-ui, sans-serif;
-  --font-mono: "DM Mono", "Cascadia Code", Consolas, monospace;
+  --font-ui: 'DM Sans', system-ui, sans-serif;
+  --font-mono: 'DM Mono', 'Cascadia Code', Consolas, monospace;
   --activity-width: 58px;
 
   --line: var(--border-nx2);
@@ -107,7 +107,7 @@ body {
   background: var(--amber-glow);
 }
 
-.activity-btn[data-count]:not([data-count="0"]):not([data-count=""])::after {
+.activity-btn[data-count]:not([data-count='0']):not([data-count=''])::after {
   background: var(--amber);
   color: #000;
 }
@@ -125,7 +125,9 @@ body {
   pointer-events: none;
   opacity: 0;
   transform: translateX(-4px);
-  transition: opacity 0.12s, transform 0.12s;
+  transition:
+    opacity 0.12s,
+    transform 0.12s;
   z-index: 100;
 }
 

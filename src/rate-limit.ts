@@ -1,8 +1,8 @@
-import rateLimit from "express-rate-limit";
+import rateLimit from 'express-rate-limit';
 
 const rateLimitMessage = {
   ok: false,
-  error: "Muitas requisições. Aguarde alguns segundos antes de tentar novamente."
+  error: 'Muitas requisições. Aguarde alguns segundos antes de tentar novamente.',
 };
 
 function createLimiter(max: number) {
@@ -11,7 +11,7 @@ function createLimiter(max: number) {
     max,
     standardHeaders: true,
     legacyHeaders: false,
-    message: rateLimitMessage
+    message: rateLimitMessage,
   });
 }
 

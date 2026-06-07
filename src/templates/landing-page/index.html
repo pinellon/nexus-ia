@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="{{meta_description}}" />
+    <title>{{title}}</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      :root {
+        --bg: #06060a;
+        --surface: #0f0f17;
+        --accent: #7c3aed;
+        --accent2: #06b6d4;
+        --text: #f0f0f8;
+        --muted: #8b8ba7;
+        --border: #1a1a2e;
+        --radius: 14px;
+      }
+      body {
+        font-family: 'Inter', sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        line-height: 1.65;
+        overflow-x: hidden;
+      }
+      /* NAV */
+      nav {
+        position: fixed;
+        top: 0;
+        width: 100%;
+        z-index: 100;
+        background: rgba(6, 6, 10, 0.85);
+        backdrop-filter: blur(14px);
+        border-bottom: 1px solid var(--border);
+        padding: 1rem 3rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .nav-logo {
+        font-weight: 900;
+        font-size: 1.3rem;
+        letter-spacing: -0.5px;
+        background: linear-gradient(135deg, var(--accent), var(--accent2));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+      .nav-links a {
+        color: var(--muted);
+        text-decoration: none;
+        margin-left: 2rem;
+        font-size: 0.95rem;
+        transition: color 0.2s;
+      }
+      .nav-links a:hover {
+        color: var(--text);
+      }
+      .nav-cta {
+        background: linear-gradient(135deg, var(--accent), var(--accent2));
+        color: #fff;
+        padding: 0.5rem 1.4rem;
+        border-radius: 8px;
+        text-decoration: none;
+        font-weight: 700;
+        font-size: 0.9rem;
+        transition: opacity 0.2s;
+      }
+      .nav-cta:hover {
+        opacity: 0.85;
+      }
+      /* HERO */
+      .hero {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 8rem 2rem 5rem;
+        position: relative;
+      }
+      .hero::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background: radial-gradient(
+          ellipse 80% 60% at 50% 10%,
+          rgba(124, 58, 237, 0.18),
+          transparent 70%
+        );
+      }
+      .hero::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 200px;
+        pointer-events: none;
+        background: linear-gradient(transparent, var(--bg));
+      }
+      .hero-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        background: rgba(124, 58, 237, 0.12);
+        border: 1px solid rgba(124, 58, 237, 0.35);
+        color: #a78bfa;
+        padding: 0.35rem 1rem;
+        border-radius: 99px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        margin-bottom: 2rem;
+      }
+      .hero h1 {
+        font-size: clamp(2.5rem, 6vw, 5.5rem);
+        font-weight: 900;
+        letter-spacing: -2px;
+        line-height: 1.08;
+        margin-bottom: 1.5rem;
+      }
+      .hero h1 span {
+        background: linear-gradient(135deg, var(--accent), var(--accent2));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+      .hero p {
+        color: var(--muted);
+        font-size: 1.2rem;
+        max-width: 600px;
+        margin: 0 auto 2.5rem;
+      }
+      .hero-btns {
+        display: flex;
+        gap: 1rem;
+        justify-content: center;
+        flex-wrap: wrap;
+        margin-bottom: 3rem;
+      }
+      .btn-primary {
+        background: linear-gradient(135deg, var(--accent), var(--accent2));
+        color: #fff;
+        padding: 0.9rem 2.5rem;
+        border-radius: 10px;
+        text-decoration: none;
+        font-weight: 700;
+        font-size: 1.05rem;
+        transition:
+          transform 0.2s,
+          opacity 0.2s;
+        display: inline-block;
+      }
+      .btn-primary:hover {
+        transform: translateY(-2px);
+        opacity: 0.9;
+      }
+      .btn-ghost {
+        border: 1px solid var(--border);
+        color: var(--text);
+        padding: 0.9rem 2rem;
+        border-radius: 10px;
+        text-decoration: none;
+        font-weight: 600;
+        transition: border-color 0.2s;
+        display: inline-block;
+      }
+      .btn-ghost:hover {
+        border-color: var(--accent);
+      }
+      /* SOCIAL PROOF */
+      .social-proof {
+        display: flex;
+        gap: 3rem;
+        justify-content: center;
+        flex-wrap: wrap;
+        margin-bottom: 1rem;
+      }
+      .social-proof span {
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+      .social-proof strong {
+        color: var(--text);
+      }
+      /* FEATURES */
+      .features {
+        max-width: 1100px;
+        margin: 6rem auto;
+        padding: 0 2rem;
+      }
+      .section-label {
+        text-align: center;
+        color: var(--accent2);
+        font-size: 0.8rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 3px;
+        margin-bottom: 0.75rem;
+      }
+      .features h2 {
+        text-align: center;
+        font-size: 2.5rem;
+        font-weight: 800;
+        letter-spacing: -1px;
+        margin-bottom: 3rem;
+      }
+      .features-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 1.5rem;
+      }
+      .feature-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 2rem;
+        transition:
+          border-color 0.2s,
+          transform 0.2s;
+      }
+      .feature-card:hover {
+        border-color: var(--accent);
+        transform: translateY(-4px);
+      }
+      .feature-icon {
+        font-size: 2rem;
+        margin-bottom: 1rem;
+      }
+      .feature-card h3 {
+        font-size: 1.1rem;
+        font-weight: 700;
+        margin-bottom: 0.6rem;
+      }
+      .feature-card p {
+        color: var(--muted);
+        font-size: 0.92rem;
+      }
+      /* CTA SECTION */
+      .cta-section {
+        margin: 6rem 2rem;
+        padding: 5rem 2rem;
+        text-align: center;
+        background: linear-gradient(135deg, rgba(124, 58, 237, 0.1), rgba(6, 182, 212, 0.1));
+        border: 1px solid rgba(124, 58, 237, 0.2);
+        border-radius: 24px;
+        max-width: 900px;
+        margin-left: auto;
+        margin-right: auto;
+      }
+      .cta-section h2 {
+        font-size: 2.5rem;
+        font-weight: 800;
+        letter-spacing: -1px;
+        margin-bottom: 1rem;
+      }
+      .cta-section p {
+        color: var(--muted);
+        font-size: 1.1rem;
+        margin-bottom: 2rem;
+      }
+      /* FOOTER */
+      footer {
+        border-top: 1px solid var(--border);
+        padding: 2rem;
+        text-align: center;
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+    </style>
+  </head>
+  <body>
+    <nav>
+      <span class="nav-logo">{{brand}}</span>
+      <div class="nav-links">
+        <a href="#features">Recursos</a>
+        <a href="#pricing">Preços</a>
+        <a href="#about">Sobre</a>
+      </div>
+      <a href="#cta" class="nav-cta">{{cta}}</a>
+    </nav>
+
+    <section class="hero">
+      <div>
+        <span class="hero-badge">✨ {{badge}}</span>
+        <h1>{{headline}}<br /><span>{{headline_accent}}</span></h1>
+        <p>{{subheadline}}</p>
+        <div class="hero-btns">
+          <a href="#cta" class="btn-primary">{{cta}}</a>
+          <a href="#features" class="btn-ghost">Ver Recursos</a>
+        </div>
+        <div class="social-proof">
+          <span>{{stat_1_label}} <strong>{{stat_1_value}}</strong></span>
+          <span>{{stat_2_label}} <strong>{{stat_2_value}}</strong></span>
+          <span>{{stat_3_label}} <strong>{{stat_3_value}}</strong></span>
+        </div>
+      </div>
+    </section>
+
+    <section class="features" id="features">
+      <p class="section-label">Recursos</p>
+      <h2>{{features_headline}}</h2>
+      <div class="features-grid">{{features}}</div>
+    </section>
+
+    <section class="cta-section" id="cta">
+      <h2>{{cta_headline}}</h2>
+      <p>{{cta_subheadline}}</p>
+      <a href="#" class="btn-primary">{{cta}}</a>
+    </section>
+
+    <footer>
+      <p>{{footer_text}} &mdash; {{brand}}</p>
+    </footer>
+  </body>
+</html>

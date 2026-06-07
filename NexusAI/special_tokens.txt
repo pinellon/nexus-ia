@@ -1,0 +1,6 @@
+init_db_and_routes
+render_template
+app_route
+Flask
+SQLAlchemy
+Bootstrap

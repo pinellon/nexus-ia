@@ -1,5 +1,5 @@
-import { buildMockAgentResponse } from "./shared.js";
-import type { AgentAdapter, AgentInput, AgentOutput, AgentName } from "./types.js";
+import { buildMockAgentResponse } from './shared.js';
+import type { AgentAdapter, AgentInput, AgentOutput, AgentName } from './types.js';
 
 export function createLocalMockAgent(name: AgentName, role: string, enabled = true): AgentAdapter {
   return {
@@ -15,8 +15,8 @@ export function createLocalMockAgent(name: AgentName, role: string, enabled = tr
         content: buildMockAgentResponse(name, role, input),
         latency: Date.now() - startedAt,
         ok: true,
-        mode: "mock"
+        mode: 'mock',
       };
-    }
+    },
   };
 }

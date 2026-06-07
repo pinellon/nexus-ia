@@ -1,4 +1,4 @@
-import type { AgentEvent } from "../agents/models.js";
+import type { AgentEvent } from '../agents/models.js';
 
 export type RunEventListener = (event: AgentEvent) => void;
 

@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="{{meta_description}}" />
+    <title>{{title}}</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      :root {
+        --bg: #0a0a0f;
+        --surface: #13131a;
+        --accent: #f97316;
+        --accent2: #ec4899;
+        --text: #f1f5f9;
+        --muted: #94a3b8;
+        --border: #1e1e2e;
+        --radius: 12px;
+      }
+      body {
+        font-family: 'Inter', sans-serif;
+        background: var(--bg);
+        color: var(--text);
+      }
+      /* TOPBAR */
+      .topbar {
+        background: linear-gradient(90deg, var(--accent), var(--accent2));
+        text-align: center;
+        padding: 0.5rem;
+        font-size: 0.85rem;
+        font-weight: 600;
+      }
+      header {
+        background: var(--surface);
+        border-bottom: 1px solid var(--border);
+        padding: 1rem 2rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .logo {
+        font-weight: 700;
+        font-size: 1.4rem;
+      }
+      .logo span {
+        background: linear-gradient(135deg, var(--accent), var(--accent2));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+      nav a {
+        color: var(--muted);
+        text-decoration: none;
+        margin-left: 1.5rem;
+        font-size: 0.95rem;
+        transition: color 0.2s;
+      }
+      nav a:hover {
+        color: var(--text);
+      }
+      .cart-btn {
+        background: var(--accent);
+        color: #fff;
+        border: none;
+        padding: 0.5rem 1.25rem;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: opacity 0.2s;
+      }
+      .cart-btn:hover {
+        opacity: 0.85;
+      }
+      /* HERO */
+      .hero {
+        background: linear-gradient(135deg, #0a0a0f 0%, #13131a 100%);
+        padding: 6rem 2rem;
+        text-align: center;
+        position: relative;
+        overflow: hidden;
+      }
+      .hero::before {
+        content: '';
+        position: absolute;
+        top: -50%;
+        left: -50%;
+        width: 200%;
+        height: 200%;
+        background: radial-gradient(ellipse, rgba(249, 115, 22, 0.08) 0%, transparent 60%);
+        pointer-events: none;
+      }
+      .hero .badge {
+        display: inline-block;
+        background: rgba(249, 115, 22, 0.15);
+        border: 1px solid rgba(249, 115, 22, 0.35);
+        color: var(--accent);
+        padding: 0.35rem 0.9rem;
+        border-radius: 99px;
+        font-size: 0.8rem;
+        font-weight: 700;
+        margin-bottom: 1.5rem;
+      }
+      .hero h1 {
+        font-size: clamp(2rem, 5vw, 4rem);
+        font-weight: 700;
+        letter-spacing: -1.5px;
+        margin-bottom: 1rem;
+      }
+      .hero h1 span {
+        background: linear-gradient(135deg, var(--accent), var(--accent2));
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+      .hero p {
+        color: var(--muted);
+        font-size: 1.1rem;
+        max-width: 580px;
+        margin: 0 auto 2.5rem;
+      }
+      .hero-actions {
+        display: flex;
+        gap: 1rem;
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+      .btn-shop {
+        background: linear-gradient(135deg, var(--accent), var(--accent2));
+        color: #fff;
+        padding: 0.85rem 2.5rem;
+        border-radius: 10px;
+        text-decoration: none;
+        font-weight: 700;
+        font-size: 1.05rem;
+        transition:
+          transform 0.2s,
+          opacity 0.2s;
+        display: inline-block;
+      }
+      .btn-shop:hover {
+        transform: translateY(-2px);
+        opacity: 0.9;
+      }
+      .btn-outline {
+        border: 1px solid var(--border);
+        color: var(--text);
+        padding: 0.85rem 2rem;
+        border-radius: 10px;
+        text-decoration: none;
+        font-weight: 600;
+        transition: border-color 0.2s;
+        display: inline-block;
+      }
+      .btn-outline:hover {
+        border-color: var(--accent);
+      }
+      /* PRODUCTS */
+      .products-section {
+        max-width: 1200px;
+        margin: 5rem auto;
+        padding: 0 2rem;
+      }
+      .section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+      }
+      .section-header h2 {
+        font-size: 1.8rem;
+        font-weight: 700;
+      }
+      .see-all {
+        color: var(--accent);
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 0.9rem;
+      }
+      .products-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+        gap: 1.5rem;
+      }
+      .product-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        overflow: hidden;
+        transition:
+          border-color 0.2s,
+          transform 0.2s;
+      }
+      .product-card:hover {
+        border-color: var(--accent);
+        transform: translateY(-4px);
+      }
+      .product-img {
+        width: 100%;
+        height: 200px;
+        background: linear-gradient(135deg, #1e1e2e, #2d2d42);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 3rem;
+      }
+      .product-info {
+        padding: 1.2rem;
+      }
+      .product-info h3 {
+        font-size: 1rem;
+        font-weight: 600;
+        margin-bottom: 0.4rem;
+      }
+      .product-info .price {
+        font-size: 1.3rem;
+        font-weight: 700;
+        color: var(--accent);
+      }
+      .product-info .old-price {
+        font-size: 0.85rem;
+        color: var(--muted);
+        text-decoration: line-through;
+        margin-left: 0.5rem;
+      }
+      .add-to-cart {
+        display: block;
+        width: 100%;
+        margin-top: 1rem;
+        background: rgba(249, 115, 22, 0.12);
+        border: 1px solid rgba(249, 115, 22, 0.3);
+        color: var(--accent);
+        padding: 0.6rem;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.2s;
+      }
+      .add-to-cart:hover {
+        background: rgba(249, 115, 22, 0.2);
+      }
+      /* BANNER */
+      .banner {
+        background: linear-gradient(135deg, rgba(249, 115, 22, 0.15), rgba(236, 72, 153, 0.15));
+        border: 1px solid rgba(249, 115, 22, 0.2);
+        margin: 4rem 2rem;
+        border-radius: 20px;
+        padding: 4rem 2rem;
+        text-align: center;
+      }
+      .banner h2 {
+        font-size: 2rem;
+        font-weight: 700;
+        margin-bottom: 1rem;
+      }
+      .banner p {
+        color: var(--muted);
+        margin-bottom: 2rem;
+      }
+      /* FOOTER */
+      footer {
+        background: var(--surface);
+        border-top: 1px solid var(--border);
+        padding: 3rem 2rem;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 2rem;
+      }
+      .footer-col h4 {
+        font-weight: 700;
+        margin-bottom: 1rem;
+      }
+      .footer-col a {
+        display: block;
+        color: var(--muted);
+        text-decoration: none;
+        font-size: 0.9rem;
+        margin-bottom: 0.5rem;
+        transition: color 0.2s;
+      }
+      .footer-col a:hover {
+        color: var(--text);
+      }
+      .footer-bottom {
+        background: var(--surface);
+        border-top: 1px solid var(--border);
+        padding: 1rem 2rem;
+        text-align: center;
+        color: var(--muted);
+        font-size: 0.85rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="topbar">🔥 {{promo_text}} — {{cta}}</div>
+
+    <header>
+      <div class="logo"><span>{{brand}}</span></div>
+      <nav>
+        <a href="#">Produtos</a>
+        <a href="#">Categorias</a>
+        <a href="#">Promoções</a>
+        <a href="#">Sobre</a>
+      </nav>
+      <button class="cart-btn">🛒 Carrinho</button>
+    </header>
+
+    <section class="hero">
+      <span class="badge">{{badge}}</span>
+      <h1>{{headline}}<br /><span>{{headline_accent}}</span></h1>
+      <p>{{subheadline}}</p>
+      <div class="hero-actions">
+        <a href="#products" class="btn-shop">{{cta}}</a>
+        <a href="#" class="btn-outline">Ver Catálogo</a>
+      </div>
+    </section>
+
+    <section class="products-section" id="products">
+      <div class="section-header">
+        <h2>Produtos em Destaque</h2>
+        <a href="#" class="see-all">Ver todos →</a>
+      </div>
+      <div class="products-grid">{{products}}</div>
+    </section>
+
+    <div class="banner">
+      <h2>{{banner_headline}}</h2>
+      <p>{{banner_subheadline}}</p>
+      <a href="#" class="btn-shop">{{banner_cta}}</a>
+    </div>
+
+    <footer>
+      <div class="footer-col">
+        <h4>{{brand}}</h4>
+        <p style="color: var(--muted); font-size: 0.9rem">{{footer_description}}</p>
+      </div>
+      <div class="footer-col">
+        <h4>Links</h4>
+        <a href="#">Produtos</a>
+        <a href="#">Sobre Nós</a>
+        <a href="#">Blog</a>
+      </div>
+      <div class="footer-col">
+        <h4>Suporte</h4>
+        <a href="#">FAQ</a>
+        <a href="#">Contato</a>
+        <a href="#">Trocas</a>
+      </div>
+    </footer>
+    <div class="footer-bottom">{{footer_text}}</div>
+  </body>
+</html>

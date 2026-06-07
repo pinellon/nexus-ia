@@ -1,11 +1,11 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import path from "node:path";
-import { randomUUID } from "node:crypto";
-import { fileURLToPath } from "node:url";
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import path from 'node:path';
+import { randomUUID } from 'node:crypto';
 
-import type { NexusIntent } from "./intent-classifier.js";
+import type { NexusIntent } from './intent-classifier.js';
+import { resolveNexusDataPath } from './nexus-data-dir.js';
 
-export type SessionMessageRole = "user" | "assistant" | "system";
+export type SessionMessageRole = 'user' | 'assistant' | 'system';
 
 export interface SessionMessage {
   id: string;
@@ -28,23 +28,25 @@ interface SessionDatabase {
   sessions: SessionRecord[];
 }
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const dataDir = path.resolve(__dirname, "../data");
-const sessionsFile = path.join(dataDir, "sessions.json");
+const dataDir = resolveNexusDataPath();
+const sessionsFile = resolveNexusDataPath('sessions.json');
 const EMPTY_DB: SessionDatabase = { sessions: [] };
 
 let initPromise: Promise<void> | null = null;
 let writeQueue: Promise<void> = Promise.resolve();
+
+// In-memory cache to avoid reading the file on every operation
+let cachedDB: SessionDatabase | null = null;
+let cacheVersion = 0;
 
 function nowIso() {
   return new Date().toISOString();
 }
 
 function deriveTitle(title?: string) {
-  const normalized = title?.replace(/\s+/g, " ").trim();
+  const normalized = title?.replace(/\s+/g, ' ').trim();
   if (!normalized) {
-    return "Nova sessao";
+    return 'Nova sessao';
   }
 
   return normalized.length > 60 ? `${normalized.slice(0, 57)}...` : normalized;
@@ -59,9 +61,9 @@ async function ensureStorage() {
     await mkdir(dataDir, { recursive: true });
 
     try {
-      await readFile(sessionsFile, "utf8");
+      await readFile(sessionsFile, 'utf8');
     } catch {
-      await writeFile(sessionsFile, JSON.stringify(EMPTY_DB, null, 2), "utf8");
+      await writeFile(sessionsFile, JSON.stringify(EMPTY_DB, null, 2), 'utf8');
     }
   })();
 
@@ -69,24 +71,39 @@ async function ensureStorage() {
 }
 
 async function readDatabase(): Promise<SessionDatabase> {
+  // Return cached version if available
+  if (cachedDB) {
+    return cachedDB;
+  }
+
   await ensureStorage();
-  const raw = await readFile(sessionsFile, "utf8");
+  const raw = await readFile(sessionsFile, 'utf8');
 
   try {
     const parsed = JSON.parse(raw) as SessionDatabase;
-    return {
-      sessions: Array.isArray(parsed.sessions) ? parsed.sessions : []
+    cachedDB = {
+      sessions: Array.isArray(parsed.sessions) ? parsed.sessions : [],
     };
+    return cachedDB;
   } catch {
-    return EMPTY_DB;
+    cachedDB = { ...EMPTY_DB };
+    return cachedDB;
   }
 }
 
 async function writeDatabase(db: SessionDatabase) {
   await ensureStorage();
-  writeQueue = writeQueue.then(() =>
-    writeFile(sessionsFile, JSON.stringify(db, null, 2), "utf8")
-  );
+  // Update cache immediately
+  cachedDB = db;
+  cacheVersion++;
+
+  // Write to disk asynchronously (debounced via queue)
+  const currentVersion = cacheVersion;
+  writeQueue = writeQueue.then(async () => {
+    // Skip write if a newer version has already been queued
+    if (currentVersion < cacheVersion) return;
+    await writeFile(sessionsFile, JSON.stringify(db, null, 2), 'utf8');
+  });
   await writeQueue;
 }
 
@@ -98,7 +115,7 @@ export async function createSession(title?: string): Promise<SessionRecord> {
     title: deriveTitle(title),
     createdAt: timestamp,
     updatedAt: timestamp,
-    messages: []
+    messages: [],
   };
 
   db.sessions.unshift(session);
@@ -133,25 +150,25 @@ export async function deleteSession(sessionId: string): Promise<boolean> {
 
 export async function appendMessage(
   sessionId: string,
-  message: Omit<SessionMessage, "createdAt" | "id">
+  message: Omit<SessionMessage, 'createdAt' | 'id'>,
 ): Promise<SessionMessage> {
   const db = await readDatabase();
   const session = db.sessions.find((entry) => entry.id === sessionId);
 
   if (!session) {
-    throw new Error("Sessao nao encontrada");
+    throw new Error('Sessao nao encontrada');
   }
 
   const nextMessage: SessionMessage = {
     id: randomUUID(),
     createdAt: nowIso(),
-    ...message
+    ...message,
   };
 
   session.messages.push(nextMessage);
   session.updatedAt = nextMessage.createdAt;
 
-  if (session.title === "Nova sessao" && message.role === "user") {
+  if (session.title === 'Nova sessao' && message.role === 'user') {
     session.title = deriveTitle(message.content);
   }
 
@@ -159,10 +176,7 @@ export async function appendMessage(
   return nextMessage;
 }
 
-export async function getRecentHistory(
-  sessionId: string,
-  limit = 10
-): Promise<SessionMessage[]> {
+export async function getRecentHistory(sessionId: string, limit = 10): Promise<SessionMessage[]> {
   const session = await getSession(sessionId);
   if (!session) {
     return [];

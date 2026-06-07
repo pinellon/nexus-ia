@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="{{meta_description}}" />
+    <title>{{title}}</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      :root {
+        --bg: #0f1117;
+        --surface: #1a1d27;
+        --accent: #6c63ff;
+        --text: #e2e8f0;
+        --muted: #94a3b8;
+        --border: #2d3348;
+        --radius: 12px;
+      }
+      body {
+        font-family: 'Inter', sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        line-height: 1.7;
+      }
+      header {
+        background: linear-gradient(135deg, #0f1117 0%, #1a1d27 100%);
+        border-bottom: 1px solid var(--border);
+        padding: 1.5rem 2rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .logo {
+        font-weight: 700;
+        font-size: 1.4rem;
+        color: var(--accent);
+        letter-spacing: -0.5px;
+      }
+      nav a {
+        color: var(--muted);
+        text-decoration: none;
+        margin-left: 2rem;
+        font-size: 0.95rem;
+        transition: color 0.2s;
+      }
+      nav a:hover {
+        color: var(--text);
+      }
+      .hero {
+        background: linear-gradient(135deg, #1a1d27 0%, #0f1117 100%);
+        padding: 5rem 2rem;
+        text-align: center;
+      }
+      .hero h1 {
+        font-size: clamp(2rem, 5vw, 3.5rem);
+        font-weight: 700;
+        letter-spacing: -1px;
+        margin-bottom: 1rem;
+      }
+      .hero h1 span {
+        background: linear-gradient(135deg, var(--accent), #a78bfa);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+      .hero p {
+        color: var(--muted);
+        font-size: 1.15rem;
+        max-width: 600px;
+        margin: 0 auto 2rem;
+      }
+      .tag {
+        display: inline-block;
+        background: rgba(108, 99, 255, 0.15);
+        color: var(--accent);
+        padding: 0.25rem 0.75rem;
+        border-radius: 99px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        margin-bottom: 1.5rem;
+      }
+      .posts {
+        max-width: 900px;
+        margin: 4rem auto;
+        padding: 0 2rem;
+        display: grid;
+        gap: 2rem;
+      }
+      .post-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 2rem;
+        transition:
+          border-color 0.2s,
+          transform 0.2s;
+      }
+      .post-card:hover {
+        border-color: var(--accent);
+        transform: translateY(-3px);
+      }
+      .post-card .date {
+        color: var(--muted);
+        font-size: 0.85rem;
+        margin-bottom: 0.5rem;
+      }
+      .post-card h2 {
+        font-size: 1.3rem;
+        font-weight: 700;
+        margin-bottom: 0.75rem;
+      }
+      .post-card p {
+        color: var(--muted);
+        font-size: 0.95rem;
+      }
+      .post-card .read-more {
+        display: inline-block;
+        margin-top: 1rem;
+        color: var(--accent);
+        font-size: 0.9rem;
+        font-weight: 600;
+        text-decoration: none;
+      }
+      .post-card .read-more:hover {
+        text-decoration: underline;
+      }
+      footer {
+        border-top: 1px solid var(--border);
+        padding: 2rem;
+        text-align: center;
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="logo">{{brand}}</div>
+      <nav>
+        <a href="#">Início</a>
+        <a href="#">Artigos</a>
+        <a href="#">Sobre</a>
+        <a href="#">{{cta}}</a>
+      </nav>
+    </header>
+
+    <section class="hero">
+      <span class="tag">Blog</span>
+      <h1>{{headline}}<br /><span>{{headline_accent}}</span></h1>
+      <p>{{subheadline}}</p>
+    </section>
+
+    <main class="posts">{{posts}}</main>
+
+    <footer>
+      <p>{{footer_text}} &mdash; {{brand}}</p>
+    </footer>
+  </body>
+</html>

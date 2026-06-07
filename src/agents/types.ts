@@ -1,8 +1,8 @@
-import type { NexusIntent } from "../intent-classifier.js";
+import type { NexusIntent } from '../intent-classifier.js';
 
-export type AgentName = "claude" | "codex" | "blackbox" | "antygravit" | "mock";
-export type AgentMode = "live" | "mock" | "disabled";
-export type AgentPhase = "planning" | "proposal" | "review";
+export type AgentName = 'claude' | 'codex' | 'blackbox' | 'antygravit' | 'mock';
+export type AgentMode = 'live' | 'mock' | 'disabled';
+export type AgentPhase = 'planning' | 'proposal' | 'review';
 
 export interface AgentInput {
   prompt: string;

@@ -1,0 +1,91 @@
+/* App.css – estilos premium para a UI de chat */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap');
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  font-family: 'Inter', sans-serif;
+  background: radial-gradient(ellipse at top left, #0d0d13, #191d2b);
+  color: #e0e0e0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#root,
+.container {
+  width: 100%;
+  max-width: 720px;
+  margin: auto;
+}
+
+.container {
+  background: rgba(30, 34, 44, 0.85);
+  backdrop-filter: blur(12px);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  padding: 2rem;
+}
+
+.title {
+  text-align: center;
+  font-size: 2rem;
+  color: #ff6b6b;
+  margin-bottom: 1.5rem;
+  font-weight: 600;
+}
+
+.prompt {
+  width: 100%;
+  padding: 0.8rem;
+  border: none;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  resize: vertical;
+}
+
+.controls {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.8rem;
+}
+
+select {
+  flex: 1;
+  padding: 0.5rem;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  border: none;
+}
+
+.sendBtn {
+  padding: 0.5rem 1.2rem;
+  background: #ff6b6b;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition:
+    transform 0.2s,
+    background 0.2s;
+}
+.sendBtn:hover {
+  background: #ff8c8c;
+  transform: translateY(-2px);
+}
+
+.responseBox {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.07);
+  border-radius: 8px;
+}
+
+.cached {
+  opacity: 0.7;
+  font-style: italic;
+}

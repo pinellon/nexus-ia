@@ -7,6 +7,7 @@ Este PR adiciona ações rápidas de IA para trechos selecionados no Monaco Edit
 ## Arquivos Criados/Modificados
 
 ### Criados:
+
 1. **public/editor-selection-actions.js** - Módulo principal com toda a lógica de ações de seleção
    - Função `getEditorSelectionContext()` para capturar contexto de seleção
    - Menu de ações rápidas (barra com 7 tipos de ações)
@@ -22,6 +23,7 @@ Este PR adiciona ações rápidas de IA para trechos selecionados no Monaco Edit
    - Testes de truncamento
 
 ### Modificados:
+
 1. **public/index.html**
    - Adicionado `<script src="/editor-selection-actions.js"></script>` após editor.js
 
@@ -40,6 +42,7 @@ Este PR adiciona ações rápidas de IA para trechos selecionados no Monaco Edit
 ## Recursos Implementados
 
 ### 1. Detecção de Seleção
+
 - `getEditorSelectionContext()` retorna:
   - Caminho do arquivo
   - Linguagem detectada
@@ -49,7 +52,9 @@ Este PR adiciona ações rápidas de IA para trechos selecionados no Monaco Edit
   - Status de modificação do arquivo
 
 ### 2. Menu de Ações
+
 Sete ações disponíveis:
+
 - **Explicar seleção** - Explicação textual (não requer salvar)
 - **Refatorar seleção** - Gera patch (requer salvar)
 - **Corrigir seleção** - Gera patch (requer salvar)
@@ -59,12 +64,14 @@ Sete ações disponíveis:
 - **Revisar segurança** - Gera patch (requer salvar)
 
 ### 3. Segurança
+
 - Bloqueio de arquivos sensíveis (.env, secrets, api-keys)
 - Bloqueio de ações com patch em arquivos dirty (não salvos)
 - Ação "Explicar" permitida mesmo em arquivos dirty
 - Detecção de padrões sensíveis no conteúdo
 
 ### 4. Integração com IA
+
 - Prompts estruturados incluem:
   - Caminho do arquivo
   - Linhas da seleção
@@ -76,6 +83,7 @@ Sete ações disponíveis:
 - Suporte a SSE para progresso em tempo real
 
 ### 5. UX
+
 - Barra flutuante no editor quando há seleção
 - Botões com ícones visuais
 - Tooltip descritivo para cada ação
@@ -83,10 +91,12 @@ Sete ações disponíveis:
 - Bloqueio visual de ações indisponíveis
 
 ## Testes
+
 - 18 testes implementados, todos passando
 - Cobertura: contexto, ações, prompts, segurança, truncamento, validação
 
 ## Critérios de Aceite ✅
+
 - ✅ Usuário seleciona código no Monaco
 - ✅ Botões de ação aparecem
 - ✅ "Explicar seleção" envia contexto para IA

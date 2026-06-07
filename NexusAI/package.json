@@ -1,0 +1,19 @@
+{
+  "name": "nexusai",
+  "version": "1.0.0",
+  "description": "Nexus Coder Tiny is a minimal, locally trainable Python code-generation model built from scratch.",
+  "main": "index.js",
+  "scripts": {
+    "test": "python -m unittest test_controlled_components.py"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.0.2",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "vite": "^8.0.14"
+  }
+}

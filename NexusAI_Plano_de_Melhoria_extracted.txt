@@ -1,0 +1,904 @@
+
+
+===== PAGE 1 =====
+NexusAI - Plano de melhoria tecnica e funcional
+Documento de trabalho - versao 1.0
+NexusAI
+Plano tecnico de melhoria, novas funcionalidades e roadmap de
+produto
+Baseado no relatorio tecnico do NexusAI, nos logs de treino, benchmark final e exemplos reais de geracao
+fornecidos pelo projeto.
+Resumo executivo
+O NexusAI tem um pipeline acima da media para um projeto local de IA: dataset auditavel, logs, checkpoints,
+benchmark e inferencia. O gargalo principal nao e organizacao do projeto; e capacidade do modelo, separacao de
+dominios, avaliacao por compilacao real e ausencia de um loop robusto de reparo de codigo. Este plano
+transforma o projeto em um assistente local de programacao por etapas, sem tentar resolver full-stack inteiro de
+uma vez.
+
+
+===== PAGE 2 =====
+NexusAI - Plano de melhoria tecnica e funcional
+Documento de trabalho - versao 1.0
+Indice do plano
+ 1. Diagnostico tecnico atual
+ 2. Prioridades em ordem correta
+ 3. Como melhorar o modelo
+ 4. Como melhorar o dataset
+ 5. Como melhorar avaliacao e benchmark
+ 6. Como resolver sintaxe quebrada e mistura de dominios
+ 7. Como transformar em assistente local funcional
+ 8. Novas funcionalidades para colocar no projeto
+ 9. Roadmap de 30, 60 e 90 dias
+ 10. Checklists praticos
+ 11. Riscos tecnicos e decisoes recomendadas
+ 12. Anexos: templates de prompts, metricas e arquitetura
+Leitura recomendada
+Use este PDF como documento de execucao. A ideia nao e apenas listar ideias, mas definir uma ordem de
+ataque: primeiro estabilizar Python/Flask, depois adicionar reparo automatico, depois evoluir para full-stack com
+memoria, preview e patch review.
+
+
+===== PAGE 3 =====
+NexusAI - Plano de melhoria tecnica e funcional
+Documento de trabalho - versao 1.0
+1. Diagnostico tecnico atual
+O NexusAI esta em um ponto comum de projetos de LLM treinados do zero: o pipeline de engenharia evoluiu mais
+rapido que a capacidade do modelo. Isso e positivo, porque significa que a base de experimentacao existe; porem,
+as metricas finais mostram que o modelo ainda nao deve ser tratado como assistente autonomo de programacao.
+Indicador Valor atual Leitura tecnica
+Loss final 2.0696 na epoch 8 A loss caiu, mas isso nao garante geracao
+compilavel. O modelo aprendeu padroes
+locais de texto melhor do que estruturas
+completas de codigo.
+Parametros 9,434,624 no state_dict Muito pequeno para full-stack multi-
+dominio. E plausivel para toy coding
+model, mas insuficiente para Flask + React
++ JSON + patches.
+compile_like_rate 0.267 Baixo. A cada 30 respostas, poucas
+parecem compilaveis. Para assistente real,
+esta metrica precisa virar a principal.
+instruction_following 0.076 Baixo. O modelo reconhece alguns
+sinais do prompt, mas ainda nao
+obedece formato e escopo.
+repetition_score 0.887 Bom. A repeticao melhorou; o proximo
+gargalo e estrutura sintatica e controle
+de dominio.
+Dataset gold 300 pares validos Bom para ajuste comportamental pequeno,
+mas insuficiente para ensinar geracao
+robusta de codigo.
+Hardware Ryzen 5 5500, 32 GB RAM, RX 6400
+sem CUDA
+Adequado para prototipos e inferencia
+local; limitado para treinar modelos
+maiores do zero.
+1.1 Diagnostico central
+Tese principal
+O modelo atual nao esta falhando porque o projeto e ruim. Ele esta falhando porque o objetivo e grande demais
+para a capacidade atual. O modelo aprendeu tokens e padroes superficiais, mas nao aprendeu uma
+representacao confiavel de sintaxe, fechamento de estruturas, separacao de linguagem e formato de resposta.
+1.2 Evidencias dos exemplos reais
+Exemplo Falha observada Causa provavel Correcao recomendada
+POST /api/v1/tasks Gerou @app.get, rota
+duplicada /v1/v1, JSON
+quebrado e corpo incompleto.
+Instruction following fraco +
+falta de exemplos
+canonicamente validos +
+ausencia de validador no loop.
+Treinar so Flask API
+compilavel; usar ast.parse e
+teste de importacao no
+benchmark; usar repair loop.
+Validador de CPF Respondeu com Flask em
+vez de funcao Python pura.
+Mistura de dominio e prompt
+template insuficiente.
+Adicionar tag de dominio;
+treinar curriculum Python
+puro antes de Flask.
+Componente React Gerou JSON/Flask em vez
+de TSX.
+Dataset multi-dominio
+confuso para modelo
+pequeno.
+Separar React em etapa
+futura; criar modelos/datasets
+por dominio ou adapter por
+dominio.
+1.3 O que ja esta forte
+ Pipeline de treino existe e tem checkpoints, logs e configuracoes.
+ Existe avaliacao quantitativa, mesmo que ainda precise ficar mais rigorosa.
+ Ja ha auditoria de dataset e preocupacao com contaminacao.
+ Ha consciencia correta de que compile_like_rate e instruction_following sao gargalos.
+ O projeto tem objetivo de produto local, nao apenas experimento isolado.
+1.4 O que precisa mudar imediatamente
+ Parar de tentar resolver Python, Flask, React, TSX, HTML, JSON e diff no mesmo modelo pequeno ao mesmo
+tempo.
+ Transformar compilacao real em criterio de aprovacao, nao apenas score textual.
+ Adicionar loop de reparo automatico na inferencia.
+
+
+===== PAGE 4 =====
+NexusAI - Plano de melhoria tecnica e funcional
+Documento de trabalho - versao 1.0
+ Migrar para tokenizer e arquitetura v2/v3 antes de gastar mais ciclos no checkpoint pequeno.
+ Criar benchmark fixo por dominio com conjunto de validacao nunca visto pelo treino.
+2. Prioridades em ordem correta
+A ordem abaixo evita o erro mais caro: adicionar funcionalidades em cima de um modelo que ainda nao produz
+codigo valido. O NexusAI deve evoluir por camadas: confiabilidade de codigo, reparo, contexto de projeto, depois
+interface e automacao.
+Prioridade Objetivo Por que vem antes Meta de aceite
+P0 Benchmark confiavel Sem avaliacao real, todo
+treino vira tentativa cega.
+Benchmark com 100 prompts
+fixos, validacao por
+parser/teste e relatorio JSON.
+P1 Python puro compilavel E a base sintatica mais
+simples antes de Flask.
+ast.parse >= 0.70 em
+prompts Python simples.
+P2 Flask API compilavel Dominio principal do projeto. compile_like_rate Flask >=
+0.50 e rotas corretas em
+smoke tests.
+P3 Repair loop Mesmo modelos bons erram;
+produto precisa corrigir.
+50% dos erros sintaticos
+corrigidos automaticamente
+apos 1-2 tentativas.
+P4 Contexto local de projeto Assistente precisa entender
+arquivos existentes.
+Responder usando arvore de
+arquivos e patches
+aplicaveis.
+P5 React/TSX Frontend adiciona outro
+conjunto sintatico.
+So entrar quando
+Python/Flask estiver estavel.
+P6 Preview, memoria e agentes Funcionalidade de produto. Rodar localmente com
+aprovacao do usuario e logs
+de alteracoes.
+Regra de ouro
+Cada etapa so deve passar para a proxima se a etapa anterior tiver metricas objetivas. Nao adicionar React
+enquanto Flask ainda mistura JSON quebrado. Nao adicionar memoria se a geracao basica ainda nao passa no
+parser.
+3. Como melhorar o modelo
+3.1 Decisao: abandonar ou congelar o checkpoint pequeno
+O checkpoint de aproximadamente 9,4M parametros deve ser congelado como baseline historico. Ele e util para
+comparacao e debugging, mas nao deve receber mais tempo pesado de fine-tuning. O ganho de repetition_score
+mostra progresso, mas compile_like_rate e instruction_following indicam teto de capacidade.
+Opcao Quando usar Vantagem Risco
+Continuar 9,4M Apenas para testes rapidos
+de pipeline.
+Treina rapido em CPU. Provavel teto baixo em
+codigo real.
+Migrar para v2 17M Proxima etapa minima
+recomendada.
+Mais capacidade sem
+explodir custo.
+Ainda pode ser pequeno para
+full-stack.
+Criar v3 50M-120M Quando benchmark e dataset
+estiverem maduros.
+Mais chance de aprender
+sintaxe e dominios.
+Treino em CPU fica caro;
+precisa planejamento de
+hardware.
+Usar base pretreinada +
+ajuste local
+Caminho mais pratico para
+produto.
+Melhor qualidade inicial. Menos "do zero"; exige outra
+estrategia de integracao.
+3.2 Arquitetura recomendada para proxima versao scratch
+A v2 descrita no relatorio tecnico e coerente: hidden_size 384, 6 layers, 6 heads, dim_feedforward 1536,
+max_seq_len 512, tokenizer 16k, Pre-LayerNorm, weight tying, warmup e cosine decay. Essa deve ser a proxima
+base minima. Se o hardware permitir, a v3 deve crescer mantendo estabilidade.
+Componente v2 minima v3 recomendada Motivo
+hidden_size 384 512-768 Aumenta capacidade de
+representar estruturas de
+codigo.
+num_layers 6 8-12 Mais profundidade ajuda
+dependencias longas e
+fechamento sintatico.
+
+
+===== PAGE 5 =====
+NexusAI - Plano de melhoria tecnica e funcional
+Documento de trabalho - versao 1.0
+num_heads 6 8-12 Melhor separacao de
+padroes e dominios.
+vocab_size 16k codigo 16k-32k codigo Reduz fragmentacao de
+tokens como jsonify, route,
+Response.
+max_seq_len 512 1024 se possivel Codigo real e contexto de
+arquivo passam facilmente
+de 512 tokens.
+norm Pre-LN Pre-LN ou RMSNorm Mais estabilidade em treino.
+MLP GELU SwiGLU se implementar Melhor expressividade por
+parametro.
+posicao aprendida RoPE se implementar Melhor extrapolacao de
+comprimento.
+3.3 Hiperparametros e sinais de alerta
+Item Recomendacao Sinal de alerta Acao
+Learning rate Comecar 3e-4 na v2; testar
+1e-4 e 5e-4 em runs curtos.
+Loss explode ou nao desce
+nas primeiras centenas de
+steps.
+Checar collate, mascara
+causal, targets shifted e
+tokenizer.
+Batch efetivo Manter acumulacao para
+simular batch maior.
+Gradiente instavel ou loss
+serrilhada demais.
+Aumentar acumulacao ou
+reduzir LR.
+Dropout 0.10-0.15 para dataset
+pequeno.
+Overfit com loss muito baixa
+e benchmark ruim.
+Aumentar dados, reduzir
+epochs, usar early stopping.
+Weight decay 0.01 como base. Memorizacao de templates. Aumentar diversidade e
+validar por held-out.
+Early stopping Patience 2-3 com delta claro. Treino melhora loss mas
+piora compile.
+Escolher checkpoint por
+score de benchmark, nao so
+loss.
+3.4 Treino curricular
+O modelo precisa aprender em ordem. Em vez de misturar tudo, use curriculo. Cada fase treina uma habilidade e so
+avanca se passar em benchmark.
+Fase Conteudo Exemplos Criterio para avancar
+Fase A Python puro sem framework funcoes, listas, dicts,
+validadores, parsing,
+dataclasses simples
+ast.parse >= 0.70; sem Flask
+quando prompt pedir funcao
+pura.
+Fase B Flask basico GET/POST, request.json,
+jsonify, status code
+Rotas corretas; importacao
+sem erro; JSON valido.
+Fase C Flask com validacao campos obrigatorios, erro
+400, CRUD em memoria
+Smoke tests passam em
+subprocess.
+Fase D Testes e patch pytest, diffs pequenos,
+correcao de bugs
+Patch aplicavel; teste gerado
+roda.
+Fase E React/TSX componentes pequenos,
+estado vazio, filtro, props
+Parser TSX/checagem
+simples passa.
+3.5 Escolha de checkpoint por benchmark, nao por loss
+A loss 2.0696 parece boa, mas o modelo ainda gera codigo invalido. Isso significa que o checkpoint "best" por loss
+nao necessariamente e o melhor por qualidade de codigo. Salve e compare checkpoints por: compilacao, aderencia
+ao prompt, ausencia de mistura de dominio, formato de resposta e taxa de reparo.
+checkpoint_score = (
+    0.40 * python_ast_pass_rate +
+    0.25 * flask_smoke_pass_rate +
+    0.20 * instruction_following_rate +
+    0.10 * no_domain_mixing_rate +
+    0.05 * repetition_score
+)
+
+
+===== PAGE 6 =====
+NexusAI - Plano de melhoria tecnica e funcional
+Documento de trabalho - versao 1.0
+4. Como melhorar o dataset
+O dataset atual gold de 300 pares e limpo, mas pequeno e heterogeneo. A distribuicao tem Python, HTML, TSX,
+text/debug, TypeScript, diff e JSON. Para um modelo pequeno, essa mistura dilui o aprendizado. A melhoria mais
+importante e transformar o dataset em trilhas separadas por dominio, com validacao automatica antes de entrar no
+treino.
+Problema Impacto Solucao pratica
+Poucos exemplos gold O modelo memoriza estilo mas nao
+generaliza.
+Criar 2k-5k exemplos Python/Flask
+validados automaticamente.
+Mistura de dominios Prompt de CPF vira Flask; prompt React
+vira JSON.
+Separar datasets e usar tags de dominio
+no prompt.
+Sem garantia de compilacao real compile_like_rate fica baixo. Rodar parser/teste em todo exemplo
+antes de aceitar.
+Respostas com markdown variavel Extractor confunde ou modelo gera lixo
+antes do codigo.
+Padronizar: codigo puro ou bloco unico,
+nunca ambos no mesmo split.
+Prompts genericos Modelo nao aprende restricoes precisas. Prompts com contrato: linguagem,
+entrada, saida, regras e formato.
+4.1 Formato recomendado de exemplo SFT
+Cada exemplo deve conter contrato claro. O modelo precisa saber linguagem, dominio, restricoes e formato
+esperado. Isso reduz mistura de contextos.
+### Domain: python_flask
+### Task: generate_code
+### Constraints:
+- Responda apenas com codigo Python valido.
+- Use Flask, request e jsonify.
+- Crie rota POST /api/v1/tasks.
+- Se title estiver vazio, retorne erro 400.
+### Instruction:
+Crie uma API Flask com rota POST /api/v1/tasks, validacao JSON e resposta de erro quando o titulo estiver vazio.
+### Response:
+from flask import Flask, jsonify, request
+app = Flask(__name__)
+tasks = []
+@app.post("/api/v1/tasks")
+def create_task():
+    data = request.get_json(silent=True) or {}
+    title = str(data.get("title", "")).strip()
+    if not title:
+        return jsonify({"error": "title is required"}), 400
+    task = {"id": len(tasks) + 1, "title": title, "done": False}
+    tasks.append(task)
+    return jsonify(task), 201
+4.2 Regras de entrada no dataset
+ Todo exemplo Python precisa passar em ast.parse antes de entrar no treino.
+ Todo exemplo Flask precisa passar em importacao simples sem executar servidor.
+ Todo JSON precisa passar em json.loads.
+ Todo TSX precisa ficar fora do dataset principal ate Python/Flask estabilizar.
+ Todo exemplo deve ter uma tag de dominio e uma tag de tarefa.
+ Deduplicar exemplos por hash normalizado do prompt e da resposta.
+ Separar train/validation/test antes de gerar metricas, com test congelado.
+
+
+===== PAGE 7 =====
+NexusAI - Plano de melhoria tecnica e funcional
+Documento de trabalho - versao 1.0
+4.3 Dataset minimo recomendado por fase
+Fase Quantidade minima Conteudo Validador
+Python puro 2.000 exemplos funcoes, validadores,
+parsing, collections, arquivos
+simples
+ast.parse + exec controlado
+quando aplicavel
+Flask API 2.000 exemplos rotas, request JSON, status
+code, CRUD em memoria
+ast.parse + import + flask
+test_client
+Bug fix / repair 1.000 pares codigo quebrado + erro +
+codigo corrigido
+teste antes falha, depois
+passa
+Patch/diff 500 exemplos alteracoes pequenas em
+arquivos existentes
+aplicar patch em repo
+temporario
+React/TSX 2.000 exemplos componentes pequenos e
+estados
+parser/linter especifico de
+TSX
+4.4 DPO ou preferencia comportamental
+Quando houver pares bons e ruins, use-os para ensinar preferencia. O par ruim deve representar exatamente as
+falhas atuais: rota errada, mistura Flask/React, JSON quebrado, markdown sobrando e codigo incompleto. O par
+bom deve ser curto, compilavel e seguir o prompt.
+Par ruim Par bom Aprendizado esperado
+Gera Flask quando prompt pede CPF
+puro.
+Funcao validate_cpf limpa caracteres e
+valida digitos.
+Separacao de dominio.
+Gera @app.get em prompt POST. Usa @app.post e status 201/400. Obediencia a instrucao.
+JSON quebrado com chaves repetidas. jsonify com objeto valido. Sintaxe e formato.
+Mistura markdown e codigo. Resposta em formato unico. Controle de saida.
+5. Como melhorar avaliacao e benchmark
+A avaliacao precisa deixar de ser majoritariamente heuristica e passar a executar validadores reais. O benchmark
+deve responder: o codigo compila? a rota existe? o status code esta correto? o modelo obedeceu o dominio pedido?
+Metrica Como medir Meta minima Meta produto
+python_ast_pass_rate ast.parse na resposta
+extraida
+0.70 0.90
+flask_import_pass_rate import do arquivo em
+subprocess
+0.50 0.80
+flask_route_pass_rate test_client chama rota
+esperada
+0.40 0.75
+instruction_following checar rota, metodo, nomes,
+linguagem e formato
+0.15 0.40
+domain_mixing_rate detectar tokens de dominio
+errado
+< 0.20 < 0.05
+repair_success_rate falha inicial corrigida apos
+repair prompt
+0.30 0.70
+repetition_score heuristica atual 0.85 0.92
+5.1 Benchmark fixo de 100 prompts
+Bloco Quantidade Exemplos de tarefas Validador
+Python puro 25 CPF, email, slug, parse CSV,
+soma agrupada
+ast.parse + testes unitarios
+simples
+Flask API 35 CRUD tasks, usuarios, login
+fake, validacao JSON
+ast.parse + test_client
+Debug/repair 15 corrigir sintaxe, corrigir rota,
+corrigir retorno
+antes falha, depois passa
+Patch pequeno 10 alterar funcao existente,
+adicionar rota
+aplicar diff + rodar teste
+React futuro 15 busca, estado vazio, lista
+filtrada
+parser TSX ou checklist
+estrutural
+5.2 Relatorio de avaliacao recomendado
+{
+  "run_id": "eval_YYYYMMDD_HHMM",
+  "checkpoint": "nexus_v2_epoch_04.pt",
+
+
+===== PAGE 8 =====
+NexusAI - Plano de melhoria tecnica e funcional
+Documento de trabalho - versao 1.0
+  "domain_scores": {
+    "python": {"ast_pass": 0.76, "tests_pass": 0.42},
+    "flask": {"ast_pass": 0.58, "route_pass": 0.31},
+    "repair": {"repair_success": 0.37}
+  },
+  "failure_clusters": [
+    "wrong_http_method",
+    "json_syntax_broken",
+    "domain_mixing_flask_react",
+    "incomplete_function_body"
+  ]
+}
+5.3 Como interpretar resultados
+ Se loss melhora e benchmark piora, o modelo esta memorizando padroes de treino.
+ Se ast_pass sobe mas instruction_following fica baixo, o modelo escreve codigo valido para a tarefa errada.
+ Se repetition_score sobe mas compile cai, a decodificacao ficou menos repetitiva mas ainda sem estrutura.
+ Se repair_success sobe, o produto pode ficar utilizavel mesmo antes do modelo base ficar perfeito.
+ Escolha checkpoint por score de benchmark, nao apenas por loss de treino.
+6. Como resolver sintaxe quebrada e mistura de dominios
+6.1 Sintaxe quebrada
+Sintaxe quebrada deve ser tratada em tres camadas: treino, decodificacao e pos-processamento. Nao dependa
+apenas do modelo.
+Camada Acao Resultado esperado
+Treino Mais exemplos curtos e compilaveis;
+exemplos com fechamento correto de
+parenteses, chaves e indentacao.
+Modelo aprende estrutura basica.
+Decodificacao Temperatura baixa, stop sequences,
+limite de tokens e prompt de codigo
+puro.
+Menos lixo apos a resposta.
+Pos-processamento Extrair codigo, rodar ast.parse, reparar
+com erro especifico.
+Resposta final mais confiavel.
+Benchmark Falhas sintaticas viram classe de erro
+rastreavel.
+Treinos passam a atacar causa raiz.
+6.2 Mistura Flask/Python/React/JSON
+A mistura de dominios e o sintoma mais claro de modelo pequeno treinado em dataset heterogeneo. Resolva com
+tags, curriculo e roteamento por dominio.
+Tecnica Como aplicar Exemplo
+Tags de dominio Adicionar cabecalho fixo antes de toda
+instrucao.
+### Domain: python_flask
+Roteador simples Antes de gerar, classificar prompt como
+python, flask, react ou patch.
+CPF -> python_puro; POST route ->
+flask_api
+Adapters/datasets separados Treinar/fine-tunar por dominio ou usar
+checkpoints separados.
+nexus_python.pt e nexus_flask.pt
+Bloqueio por vocabulário Durante avaliacao, penalizar tokens de
+dominio errado.
+React prompt nao pode conter jsonify;
+Flask prompt nao deve conter useState.
+Curriculo React so entra depois de Flask passar. Nao misturar TSX no dataset principal
+agora.
+6.3 Loop de reparo automatico
+O repair loop e a funcionalidade que mais pode aumentar utilidade rapidamente. Ele transforma uma resposta
+quebrada em tentativa corrigida usando erro real do parser ou dos testes.
+def generate_with_repair(prompt, max_repairs=2):
+
+
+===== PAGE 9 =====
+NexusAI - Plano de melhoria tecnica e funcional
+Documento de trabalho - versao 1.0
+    code = model_generate(prompt)
+    for attempt in range(max_repairs + 1):
+        ok, error = validate_code(code)
+        if ok:
+            return code
+        repair_prompt = f"""
+Corrija o codigo abaixo. Responda apenas com codigo valido.
+Erro do validador:
+{error}
+Codigo:
+{code}
+"""
+        code = model_generate(repair_prompt)
+    return code
+6.4 Extractor mais rigoroso
+ Se houver bloco ```python, extrair somente o bloco.
+ Se nao houver bloco, tentar extrair do primeiro import/def/class ate o final coerente.
+ Remover prefixos soltos como " = [" antes do codigo.
+ Rejeitar resposta que contenha tokens de dominio proibido.
+ Salvar resposta bruta e resposta extraida para auditoria.
+7. Como transformar em assistente local funcional
+Mesmo antes de ter um modelo perfeito, o NexusAI pode virar uma ferramenta funcional se for projetado como
+sistema, nao apenas como checkpoint. O modelo deve ser apenas uma peca dentro de um pipeline com contexto,
+validacao, patch, preview e memoria.
+Modulo Funcao Implementacao inicial Valor para o usuario
+Project Indexer Ler arvore de arquivos e
+resumir projeto.
+Scan local + ignore
+node_modules/venv +
+metadados JSON.
+O assistente entende o
+projeto Nexus.
+Context Builder Selecionar arquivos
+relevantes para o prompt.
+Busca por nomes, extensoes
+e embeddings simples.
+Menos alucinacao sobre
+arquivos.
+Patch Engine Aplicar mudancas como diff. Gerar unified diff e pedir
+aprovacao.
+Evita sobrescrever arquivos
+inteiros.
+Validator Rodar ast.parse, pytest, flask
+test_client, npm check
+quando houver.
+Subprocess sandbox. Resposta nao aprovada se
+quebrar.
+Preview Runner Subir Flask ou frontend local
+com log.
+Comando aprovado pelo
+usuario.
+Usuario ve site/app
+funcionando.
+Memory Guardar decisoes do projeto,
+rotas, entidades e stack.
+SQLite/JSON local. Assistente lembra padroes do
+Nexus.
+Evaluator Dashboard Mostrar metricas por
+checkpoint.
+HTML local ou Flask
+dashboard.
+Acompanha evolucao real.
+7.1 Arquitetura de produto recomendada
+NexusAI App
+ core/├──
+    model_runner.py          # inferencia local│ ├──
+    prompt_builder.py        # templates por dominio│ ├──
+    code_extractor.py        # extrai codigo da resposta│ ├──
+    validators.py            # ast, flask, json, tests│ ├──
+    repair_loop.py           # corrige com erro real│ ├──
+    patch_engine.py          # gera/aplica diffs│ └──
+ project/├──
+    indexer.py               # le arquivos locais│ ├──
+    context_selector.py      # escolhe contexto relevante│ ├──
+
+
+===== PAGE 10 =====
+NexusAI - Plano de melhoria tecnica e funcional
+Documento de trabalho - versao 1.0
+    memory_store.py          # SQLite/JSON│ └──
+ eval/├──
+    benchmark.py             # 100 prompts congelados│ ├──
+    reports.py               # metricas e graficos│ ├──
+    failure_analysis.py      # clusters de erro│ └──
+ ui/└──
+     cli.py                   # modo terminal├──
+     web_app.py               # painel local futuro└──
+7.2 Modo de uso ideal
+1. Usuario pede: "crie rota POST /api/v1/tasks".
+2. Roteador classifica como python_flask.
+3. Context Builder inclui app.py, routes.py ou estrutura atual se existir.
+4. Modelo gera codigo ou diff.
+5. Extractor limpa a resposta.
+6. Validator roda ast.parse e teste Flask.
+7. Se falhar, repair_loop tenta corrigir.
+8. Patch Engine mostra diff e pede aprovacao.
+9. Preview Runner testa localmente.
+8. Novas funcionalidades para colocar no projeto
+A lista abaixo prioriza funcionalidades que tornam o NexusAI util mesmo com um modelo pequeno, pois adicionam
+engenharia ao redor do modelo.
+8.1 Funcionalidades de desenvolvimento
+Funcionalidade Descricao Primeira versao viavel
+Gerador de rotas Flask Criar endpoints
+GET/POST/PUT/DELETE com
+validacao JSON.
+Templates + modelo + teste test_client.
+Gerador de CRUD Criar CRUD em memoria ou SQLite
+para uma entidade.
+Entrada: nome da entidade e campos.
+Gerador de testes Criar pytest para funcoes e rotas. Testes basicos de status code e
+payload.
+Bug fixer Receber erro/traceback e corrigir
+arquivo.
+Prompt com erro + arquivo + patch.
+Patch review Explicar diff antes de aplicar. Resumo de arquivos alterados e riscos.
+Refactor assistant Renomear funcao, extrair validacao,
+limpar duplicacao.
+Pequenos diffs aplicaveis.
+Documentador Gerar README, docstring e
+comentarios uteis.
+Sem alterar logica.
+8.2 Funcionalidades de produto local
+Funcionalidade Descricao Valor
+Painel de checkpoints Lista checkpoints, loss, metricas e
+exemplos.
+Ajuda a decidir qual modelo usar.
+Playground de prompts Testar prompt, ver resposta bruta,
+extraida e validada.
+Debug rapido.
+Memoria do projeto Guardar stack, convencoes, entidades,
+rotas e decisoes.
+Respostas mais consistentes.
+Preview integrado Rodar app local e mostrar logs. Fecha ciclo gerar-testar-ver.
+Modo seguro Nenhum comando roda sem aprovacao. Evita alteracoes perigosas.
+Historico de patches Salvar tudo que foi alterado. Permite rollback.
+Modo avaliador Comparar dois checkpoints no mesmo
+benchmark.
+Evolucao objetiva.
+8.3 Funcionalidades de IA mais avancadas
+Ideia Como implementar em versao
+simples Quando fazer
+
+
+===== PAGE 11 =====
+NexusAI - Plano de melhoria tecnica e funcional
+Documento de trabalho - versao 1.0
+RAG local de codigo Indexar arquivos e recuperar trechos
+relevantes.
+Depois do patch engine.
+Planejador de tarefas Quebrar pedido grande em passos e
+aprovar cada passo.
+Quando CRUD basico funcionar.
+Auto-avaliador O modelo critica sua propria resposta
+antes de validar.
+Depois do repair loop.
+Multi-checkpoint router Escolher checkpoint Python, Flask ou
+React conforme prompt.
+Quando houver checkpoints
+especializados.
+Fine-tuning com feedback real Salvar exemplos aprovados/rejeitados
+pelo usuario.
+Depois que a UI tiver uso real.
+Agente de projeto Ler, modificar, testar e propor proximo
+passo.
+Somente com sandbox e aprovacao.
+8.4 Ideias especificas para o Nexus
+ Botao "Gerar rota" com formulario: metodo, path, campos obrigatorios e formato de resposta.
+ Botao "Criar tela" para gerar HTML/React depois que a API estiver validada.
+ Botao "Testar tudo" que roda validadores e mostra erros em linguagem simples.
+ Botao "Corrigir erro" que pega traceback e tenta gerar patch.
+ Botao "Adicionar memoria" para registrar convencoes do projeto.
+ Botao "Comparar modelos" para ver saidas lado a lado do checkpoint antigo e novo.
+ Modo "mentor" que explica por que uma geracao falhou no benchmark.
+ Modo "dataset builder" que transforma codigo aprovado em novo exemplo de treino.
+9. Roadmap de 30, 60 e 90 dias
+9.1 Primeiros 30 dias - estabilizar base
+Semana Entrega Criterio de pronto
+1 Benchmark fixo de 100 prompts +
+validadores reais.
+Relatorio JSON com ast_pass,
+flask_pass, instruction_following e
+failure_clusters.
+2 Dataset Python puro e Flask separado. Pelo menos 1.000 exemplos validados
+automaticamente.
+3 Treino v2 com tokenizer 16k. Comparacao contra baseline 9.4M no
+mesmo benchmark.
+4 Repair loop v1. Pelo menos 30% dos erros de sintaxe
+corrigidos apos uma tentativa.
+9.2 60 dias - produto local minimo
+Entrega Descricao Meta
+CLI NexusAI Comandos gerar, validar, reparar e
+aplicar patch.
+Fluxo terminal completo.
+Project Indexer Leitura da arvore do projeto e selecao
+de contexto.
+Ignora pastas pesadas e monta contexto
+relevante.
+Patch Engine Gera diff e pede aprovacao. Nao sobrescreve sem confirmacao.
+Dashboard simples Mostra metricas por checkpoint. Escolha de modelo por evidencia.
+Flask stable Rotas simples compilaveis. compile_like_rate Flask >= 0.50.
+9.3 90 dias - assistente funcional
+Entrega Descricao Meta
+Memoria local SQLite/JSON com stack, rotas,
+entidades e preferencias.
+Respostas consistentes no projeto
+Nexus.
+Preview local Rodar app e capturar logs. Gerar, testar e visualizar.
+Bug fixer Traceback -> patch -> teste. Corrigir erros simples de Flask/Python.
+Dataset builder Converter exemplos aprovados em SFT. Ciclo de melhoria continuo.
+React separado Comecar trilha frontend apenas se Flask
+estiver estavel.
+Evitar regressao de dominio.
+Meta de 90 dias
+Ter um assistente local que nao precisa ser perfeito, mas consegue: entender um pequeno projeto Flask, gerar
+uma rota, validar, corrigir erro simples, mostrar diff, aplicar com aprovacao e registrar aprendizado para treino
+
+
+===== PAGE 12 =====
+NexusAI - Plano de melhoria tecnica e funcional
+Documento de trabalho - versao 1.0
+futuro.
+10. Checklists praticos
+10.1 Checklist antes de treinar
+ [ ] Train/validation/test separados e congelados.
+ [ ] Dataset deduplicado.
+ [ ] Exemplos Python passam em ast.parse.
+ [ ] Exemplos Flask passam em importacao/test_client quando aplicavel.
+ [ ] Prompts com tag de dominio.
+ [ ] Respostas com formato unico.
+ [ ] Config salva junto do checkpoint.
+ [ ] Seeds e versoes registradas.
+ [ ] Benchmark baseline rodado antes do novo treino.
+10.2 Checklist depois de treinar
+ [ ] Salvar curva de loss por epoch.
+ [ ] Rodar benchmark fixo completo.
+ [ ] Comparar contra baseline antigo.
+ [ ] Gerar 20 exemplos manuais por dominio.
+ [ ] Classificar falhas em clusters.
+ [ ] Escolher checkpoint por benchmark, nao so por loss.
+ [ ] Atualizar changelog do modelo.
+ [ ] Guardar exemplos de falha para novo dataset de repair.
+10.3 Checklist para uma resposta de codigo ser aceita
+ [ ] Respondeu a linguagem certa.
+ [ ] Respondeu ao framework certo.
+ [ ] Nao misturou dominios.
+ [ ] Codigo extraido sem lixo antes/depois.
+ [ ] ast.parse passou.
+ [ ] Teste especifico passou.
+ [ ] Nao criou rota/metodo diferente do prompt.
+ [ ] Nao inventou dependencias desnecessarias.
+ [ ] Se for patch, o diff aplica limpo.
+10.4 Checklist de seguranca local
+ [ ] Nenhum comando destrutivo roda sem aprovacao.
+ [ ] Patch e mostrado antes de aplicar.
+ [ ] Backup ou git diff antes de alterar arquivo.
+ [ ] Subprocess com timeout.
+ [ ] Bloquear acesso a arquivos sensiveis por padrao.
+ [ ] Logar comando executado, saida e erro.
+ [ ] Permitir rollback.
+11. Riscos tecnicos e decisoes recomendadas
+Risco Probabilidade Impacto Mitigacao
+Continuar treinando modelo
+pequeno esperando salto
+grande.
+Alta Alto Congelar baseline e migrar
+para v2/v3 ou base
+pretreinada.
+Dataset multi-dominio
+confundir o modelo.
+Alta Alto Curriculo e roteador por
+dominio.
+Metrica agregada mascarar
+falhas criticas.
+Media Alto Separar metricas por dominio
+e usar compilacao real.
+CPU limitar experimentos
+maiores.
+Alta Medio Runs curtos, acumulacao,
+checkpoints menores e
+considerar treino externo
+pontual.
+Adicionar UI antes do modelo Media Medio UI deve expor validacao, nao
+
+
+===== PAGE 13 =====
+NexusAI - Plano de melhoria tecnica e funcional
+Documento de trabalho - versao 1.0
+validar codigo. esconder erros.
+Repair loop entrar em
+repeticao.
+Media Medio Limitar tentativas e registrar
+falhas.
+Memoria salvar informacao
+errada.
+Media Medio Memoria editavel, com fontes
+e confirmacao.
+11.1 Decisoes que eu recomendo
+Decisao Recomendacao
+Modelo atual Congelar como baseline. Nao investir mais pesado nele.
+Proxima arquitetura Rodar v2 real com tokenizer 16k e Pre-LN.
+Escopo inicial Python puro + Flask. React somente depois.
+Metrica principal Compilacao/execucao real por dominio.
+Produto Construir sistema com repair, patch e validacao, nao apenas
+chat.
+Dataset Aumentar exemplos validos e criar trilha de repair.
+Hardware Usar CPU para prototipos e considerar aceleracao externa
+apenas quando benchmark estiver maduro.
+11.2 O que eu nao faria agora
+ Nao tentaria transformar o modelo atual em concorrente geral de modelos grandes.
+ Nao adicionaria React/TSX ao treino principal antes de Flask passar em validacao.
+ Nao escolheria checkpoint apenas por loss.
+ Nao construiria UI bonita antes de ter validadores e patch engine.
+ Nao deixaria o assistente editar arquivos sem diff e aprovacao.
+ Nao misturaria respostas com markdown se o objetivo principal e codigo compilavel.
+12. Anexos praticos
+12.1 Prompt base para Flask
+### System:
+Voce e o NexusAI, um assistente local de programacao. Responda apenas com codigo valido.
+### Domain: python_flask
+### Output format:
+- Apenas codigo Python.
+- Nao use Markdown.
+- Nao explique.
+### Constraints:
+- Use Flask, request e jsonify.
+- Use o metodo HTTP solicitado.
+- Use exatamente a rota solicitada.
+- Valide JSON com request.get_json(silent=True) or {}.
+- Retorne erro 400 quando campo obrigatorio estiver vazio.
+### Instruction:
+{user_instruction}
+### Response:
+12.2 Prompt de repair
+### System:
+Corrija o codigo mantendo a intencao original. Responda apenas com codigo valido.
+
+
+===== PAGE 14 =====
+NexusAI - Plano de melhoria tecnica e funcional
+Documento de trabalho - versao 1.0
+### Domain: {domain}
+### Error:
+{validator_error}
+### Broken code:
+{code}
+### Response:
+12.3 Classes de falha para registrar
+Classe Descricao Exemplo
+syntax_error Parser falhou. Chave, parenteses ou indentacao
+quebrada.
+wrong_domain Linguagem/framework errado. Prompt CPF gerou Flask.
+wrong_method Metodo HTTP errado. Pediu POST, gerou GET.
+wrong_route Rota diferente. /api/v1/v1/tasks em vez de /api/v1/tasks.
+json_broken Objeto JSON invalido. {"error": "title": "total"}
+incomplete_code Funcao incompleta ou sem corpo. def create_task(): sem bloco valido.
+repetition Repetiu tokens/chaves/campos. "total" varias vezes sem sentido.
+markdown_noise Texto fora do formato esperado. ```python quebrado, prefixo " = [".
+12.4 Estrutura de experimento recomendada
+experiments/
+ 2026-06-06_v2_python_flask/├──
+    config.json│ ├──
+    train.log│ ├──
+    tokenizer.json│ ├──
+    checkpoints/│ ├──
+       epoch_01.pt│ │ ├──
+       best_by_benchmark.pt│ │ └──
+    eval/│ ├──
+       benchmark_results.json│ │ ├──
+       failures.jsonl│ │ ├──
+       examples.md│ │ └──
+    notes.md│ └──
+12.5 Definition of Done do NexusAI v1 funcional
+NexusAI v1 funcional
+O projeto pode ser chamado de v1 funcional quando conseguir, localmente: receber uma tarefa Flask simples,
+selecionar contexto, gerar codigo ou patch, validar sintaxe, executar teste basico, reparar erro simples, mostrar diff
+e aplicar somente com aprovacao.
+Criterio Meta
+Python ast_pass_rate >= 0.80 em benchmark fixo
+Flask compile/import pass >= 0.60
+Instruction following >= 0.25
+Repair success >= 0.50 em erros simples
+Patch apply success >= 0.80 em alteracoes pequenas
+Domain mixing <= 0.10
+Aprovacao humana Obrigatoria para alterar arquivos
+Logs e rollback Disponiveis em toda alteracao
+
+
+===== PAGE 15 =====
+NexusAI - Plano de melhoria tecnica e funcional
+Documento de trabalho - versao 1.0
+Conclusao
+O NexusAI nao deve ser julgado apenas pelo checkpoint atual. O modelo atual ainda nao e bom como coding
+assistant, mas a engenharia do projeto mostra maturidade: ha logs, benchmark, auditoria, metricas e objetivo de
+produto. O proximo salto vem de uma mudanca de estrategia: menos full-stack misturado, mais curriculo por
+dominio, mais validacao real, mais repair loop e mais produto ao redor do modelo.
+A direcao recomendada e clara: congelar o baseline 9,4M, migrar para v2/v3, separar Python/Flask de React,
+aumentar dataset validado, medir por compilacao real e construir o NexusAI como assistente local com patch review,
+memoria e preview. Assim, mesmo antes de atingir qualidade de modelos grandes, o sistema pode virar uma
+ferramenta real para acelerar o desenvolvimento do proprio Nexus.

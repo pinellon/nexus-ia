@@ -1,0 +1,212 @@
+[
+  {
+    "name": "html_bakery_landing",
+    "category": "web",
+    "kind": "html",
+    "prompt": "Crie um arquivo public/index.html completo para uma confeitaria profissional com hero, menu, depoimentos e botao WhatsApp.",
+    "expected_terms": ["html", "head", "body", "section", "whatsapp", "menu", "depoimentos"]
+  },
+  {
+    "name": "html_coworking_landing",
+    "category": "web",
+    "kind": "html",
+    "prompt": "Crie uma landing page para um coworking com planos, estrutura, formulario de contato e CTA.",
+    "expected_terms": ["html", "planos", "form", "contato", "coworking", "section"]
+  },
+  {
+    "name": "html_saas_dashboard",
+    "category": "web",
+    "kind": "html",
+    "prompt": "Crie um dashboard SaaS em HTML com sidebar, cards de metricas, lista de projetos e atividade recente.",
+    "expected_terms": ["html", "sidebar", "dashboard", "metric", "projetos", "atividade"]
+  },
+  {
+    "name": "css_responsive_cards",
+    "category": "web",
+    "kind": "css",
+    "prompt": "Crie CSS responsivo para uma grade de cards com 3 colunas no desktop e 1 coluna no mobile.",
+    "expected_terms": ["grid", "media", "card", "gap", "minmax"]
+  },
+  {
+    "name": "js_form_validation",
+    "category": "web",
+    "kind": "javascript",
+    "prompt": "Crie JavaScript para validar um formulario de contato com nome, email e mensagem antes de enviar.",
+    "expected_terms": ["addEventListener", "submit", "email", "preventDefault", "alert"]
+  },
+  {
+    "name": "flask_tasks_api",
+    "category": "backend",
+    "kind": "python",
+    "prompt": "Crie uma API Flask com rota POST /api/v1/tasks, validacao JSON e resposta de erro quando o titulo estiver vazio.",
+    "expected_terms": ["flask", "request", "jsonify", "route", "POST", "titulo"]
+  },
+  {
+    "name": "flask_jwt_auth",
+    "category": "backend",
+    "kind": "python",
+    "prompt": "Crie uma API Flask com cadastro, login JWT simples e rota protegida /api/v1/me.",
+    "expected_terms": ["flask", "jwt", "login", "Authorization", "password", "token"]
+  },
+  {
+    "name": "flask_file_upload",
+    "category": "backend",
+    "kind": "python",
+    "prompt": "Crie uma rota Flask para upload de arquivo com validacao de extensao e limite de tamanho.",
+    "expected_terms": ["flask", "request.files", "upload", "extension", "secure_filename"]
+  },
+  {
+    "name": "python_cpf_validator",
+    "category": "python",
+    "kind": "python",
+    "prompt": "Crie uma funcao Python que valida CPF com limpeza de caracteres e verificacao dos digitos.",
+    "expected_terms": ["def", "cpf", "isdigit", "return", "sum"]
+  },
+  {
+    "name": "python_average_bugfix",
+    "category": "python",
+    "kind": "python",
+    "prompt": "Corrija uma funcao Python average(values) para nao quebrar quando receber lista vazia.",
+    "expected_terms": ["def average", "if not values", "return 0.0", "sum", "len"]
+  },
+  {
+    "name": "python_dataclass_service",
+    "category": "python",
+    "kind": "python",
+    "prompt": "Crie um servico Python com dataclass Product e metodo para calcular total com desconto.",
+    "expected_terms": ["dataclass", "Product", "discount", "total", "return"]
+  },
+  {
+    "name": "typescript_validator",
+    "category": "typescript",
+    "kind": "typescript",
+    "prompt": "Crie uma funcao TypeScript validateEmail(value: string): boolean com regex simples.",
+    "expected_terms": ["function", "validateEmail", "string", "boolean", "test"]
+  },
+  {
+    "name": "typescript_api_client",
+    "category": "typescript",
+    "kind": "typescript",
+    "prompt": "Crie um cliente TypeScript para GET /api/v1/projects com fetch, tratamento de erro e tipo Project.",
+    "expected_terms": ["type Project", "fetch", "async", "throw", "projects"]
+  },
+  {
+    "name": "react_customer_search",
+    "category": "react",
+    "kind": "tsx",
+    "prompt": "Crie um componente React com busca de clientes, estado vazio e lista filtrada.",
+    "expected_terms": ["useState", "useMemo", "map", "input", "empty"]
+  },
+  {
+    "name": "react_pricing_section",
+    "category": "react",
+    "kind": "tsx",
+    "prompt": "Crie uma secao React de precos com toggle mensal/anual e cards de planos.",
+    "expected_terms": ["useState", "plans", "monthly", "yearly", "button"]
+  },
+  {
+    "name": "electron_secure_main",
+    "category": "electron",
+    "kind": "typescript",
+    "prompt": "Crie um main.ts do Electron seguro com contextIsolation true, nodeIntegration false, preload e abertura de links externos.",
+    "expected_terms": ["BrowserWindow", "contextIsolation", "nodeIntegration", "preload", "shell"]
+  },
+  {
+    "name": "electron_preload_api",
+    "category": "electron",
+    "kind": "typescript",
+    "prompt": "Crie um preload.ts do Electron que expõe uma API segura listNotes, saveNote e deleteNote.",
+    "expected_terms": ["contextBridge", "ipcRenderer", "exposeInMainWorld", "listNotes", "saveNote"]
+  },
+  {
+    "name": "sql_schema",
+    "category": "ops",
+    "kind": "sql",
+    "prompt": "Crie um schema SQL simples para users, projects e tasks com chaves estrangeiras.",
+    "expected_terms": ["CREATE TABLE", "users", "projects", "tasks", "FOREIGN KEY"]
+  },
+  {
+    "name": "patch_email_validator",
+    "category": "patch_debug",
+    "kind": "patch",
+    "prompt": "Explique uma alteracao como patch revisavel para melhorar validateEmail em TypeScript.",
+    "expected_terms": ["diff", "validateEmail", "regex", "---", "+++"]
+  },
+  {
+    "name": "debug_name_error",
+    "category": "patch_debug",
+    "kind": "explanation",
+    "prompt": "Explique como corrigir um NameError em Python quando a variavel user_id nao foi definida.",
+    "expected_terms": ["NameError", "user_id", "definida", "escopo", "corrigir"]
+  },
+  {
+    "name": "debug_react_state",
+    "category": "patch_debug",
+    "kind": "explanation",
+    "prompt": "Explique por que nao devo mutar diretamente um array no state do React e mostre a correcao.",
+    "expected_terms": ["state", "React", "imutavel", "set", "spread"]
+  },
+  {
+    "name": "readme_setup",
+    "category": "ops",
+    "kind": "markdown",
+    "prompt": "Crie um README curto com instalacao, comandos de desenvolvimento, teste e build.",
+    "expected_terms": ["Instalacao", "npm", "test", "build", "desenvolvimento"]
+  },
+  {
+    "name": "dockerfile_node",
+    "category": "ops",
+    "kind": "dockerfile",
+    "prompt": "Crie um Dockerfile para app Node com npm ci, build e comando de producao.",
+    "expected_terms": ["FROM", "npm ci", "npm run build", "CMD", "NODE_ENV"]
+  },
+  {
+    "name": "github_actions_node",
+    "category": "ops",
+    "kind": "yaml",
+    "prompt": "Crie um workflow GitHub Actions para instalar Node, rodar teste, typecheck e build.",
+    "expected_terms": ["name:", "actions/checkout", "setup-node", "npm", "build"]
+  },
+  {
+    "name": "memory_add_command",
+    "category": "nexus_identity",
+    "kind": "python",
+    "prompt": "Crie uma funcao Python para adicionar uma memoria com kind, key, value, tags e importance em SQLite.",
+    "expected_terms": ["sqlite3", "INSERT", "kind", "key", "importance"]
+  },
+  {
+    "name": "code_dna_summary",
+    "category": "nexus_identity",
+    "kind": "python",
+    "prompt": "Crie uma funcao Python que analisa nomes de funcoes em arquivos .py e retorna se o estilo e snake_case.",
+    "expected_terms": ["ast", "FunctionDef", "snake_case", "return", "Path"]
+  },
+  {
+    "name": "fatigue_sensor_rule",
+    "category": "nexus_identity",
+    "kind": "python",
+    "prompt": "Crie uma regra Python que detecta usuario travado quando o mesmo erro aparece por mais de 5 minutos.",
+    "expected_terms": ["datetime", "erro", "minutos", "travado", "return"]
+  },
+  {
+    "name": "code_archaeology_git",
+    "category": "nexus_identity",
+    "kind": "python",
+    "prompt": "Crie uma funcao Python que usa git log para contar quantos commits alteraram um arquivo.",
+    "expected_terms": ["subprocess", "git", "log", "commits", "return"]
+  },
+  {
+    "name": "site_preview_route",
+    "category": "nexus_identity",
+    "kind": "typescript",
+    "prompt": "Crie uma rota Express que retorna o conteudo de public/index.html para preview seguro.",
+    "expected_terms": ["express", "readFile", "public/index.html", "res", "send"]
+  },
+  {
+    "name": "agent_patch_plan",
+    "category": "nexus_identity",
+    "kind": "json",
+    "prompt": "Crie um JSON de plano de patch com action patch_file, path, before e after para alterar um titulo.",
+    "expected_terms": ["patch_file", "path", "before", "after", "title"]
+  }
+]

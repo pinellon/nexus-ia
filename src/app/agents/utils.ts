@@ -3,13 +3,13 @@ const TOKEN_PATTERNS = [
   /\bgithub_pat_[A-Za-z0-9_]{20,}\b/g,
   /\bsk-[A-Za-z0-9]{16,}\b/g,
   /\bBearer\s+[A-Za-z0-9._-]{10,}\b/gi,
-  /\b(?:token|api[_-]?key|secret|password)\s*[:=]\s*["']?[^"'\s]+["']?/gi
+  /\b(?:token|api[_-]?key|secret|password)\s*[:=]\s*["']?[^"'\s]+["']?/gi,
 ];
 
 export function redactSensitiveText(value: string) {
-  let next = String(value || "");
+  let next = String(value || '');
   for (const pattern of TOKEN_PATTERNS) {
-    next = next.replace(pattern, "[redacted]");
+    next = next.replace(pattern, '[redacted]');
   }
   return next;
 }

@@ -38,6 +38,36 @@ Abra:
 http://localhost:4000
 ```
 
+## Developer Quickstart
+
+Instale dependências e rode em modo desenvolvimento:
+
+```powershell
+npm install
+npm run dev
+```
+
+Build para produção:
+
+```powershell
+npm run build
+```
+
+Executar testes e checar tipos:
+
+```powershell
+npm test
+npm run typecheck
+```
+
+Desktop (Electron) desenvolvimento:
+
+```powershell
+npm run desktop:dev
+```
+
+Observação: alguns scripts (`lint`, `format:check`) dependem de ferramentas externas (`eslint`, `prettier`) — instale-as globalmente ou adicione às `devDependencies` se quiser usar.
+
 ## Configuracao de IA
 
 O Nexus pode usar provider local ou premium pelo backend. Nunca coloque API key no frontend.

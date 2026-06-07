@@ -1,14 +1,12 @@
-import { randomUUID } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { randomUUID } from 'node:crypto';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import path from 'node:path';
 
-import type { AgentArtifact, AgentArtifactType } from "./models.js";
-import { nowIso, sanitizeArtifactPreview } from "./utils.js";
+import type { AgentArtifact, AgentArtifactType } from './models.js';
+import { nowIso, sanitizeArtifactPreview } from './utils.js';
+import { resolveNexusDataPath } from '../../nexus-data-dir.js';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const dataRoot = path.resolve(__dirname, "../../../data/projects");
+const dataRoot = resolveNexusDataPath('projects');
 
 interface ArtifactIndex {
   artifacts: AgentArtifact[];
@@ -16,35 +14,35 @@ interface ArtifactIndex {
 
 function extensionForArtifact(type: AgentArtifactType) {
   switch (type) {
-    case "plan":
-      return "plan.md";
-    case "diff":
-      return "diff.patch";
-    case "patch":
-      return "patch.patch";
-    case "terminal_output":
-      return "terminal.txt";
-    case "test_result":
-      return "tests.json";
-    case "security_report":
-      return "security.md";
-    case "docs_update":
-      return "readme_draft.md";
-    case "file_summary":
+    case 'plan':
+      return 'plan.md';
+    case 'diff':
+      return 'diff.patch';
+    case 'patch':
+      return 'patch.patch';
+    case 'terminal_output':
+      return 'terminal.txt';
+    case 'test_result':
+      return 'tests.json';
+    case 'security_report':
+      return 'security.md';
+    case 'docs_update':
+      return 'readme_draft.md';
+    case 'file_summary':
     default:
-      return "summary.md";
+      return 'summary.md';
   }
 }
 
 function contentAsString(content: string | object) {
-  return typeof content === "string" ? content : JSON.stringify(content, null, 2);
+  return typeof content === 'string' ? content : JSON.stringify(content, null, 2);
 }
 
 export class ArtifactStore {
   private indexCache = new Map<string, ArtifactIndex>();
 
   private async ensureProjectArtifactDir(projectId: string) {
-    const artifactDir = path.join(dataRoot, projectId, "artifacts");
+    const artifactDir = path.join(dataRoot, projectId, 'artifacts');
     await mkdir(artifactDir, { recursive: true });
     return artifactDir;
   }
@@ -55,10 +53,10 @@ export class ArtifactStore {
     }
 
     const artifactDir = await this.ensureProjectArtifactDir(projectId);
-    const indexPath = path.join(artifactDir, "index.json");
+    const indexPath = path.join(artifactDir, 'index.json');
 
     try {
-      const raw = await readFile(indexPath, "utf8");
+      const raw = await readFile(indexPath, 'utf8');
       const parsed = JSON.parse(raw) as ArtifactIndex;
       const index = { artifacts: Array.isArray(parsed.artifacts) ? parsed.artifacts : [] };
       this.indexCache.set(projectId, index);
@@ -72,7 +70,7 @@ export class ArtifactStore {
 
   private async saveIndex(projectId: string, index: ArtifactIndex) {
     const artifactDir = await this.ensureProjectArtifactDir(projectId);
-    await writeFile(path.join(artifactDir, "index.json"), JSON.stringify(index, null, 2), "utf8");
+    await writeFile(path.join(artifactDir, 'index.json'), JSON.stringify(index, null, 2), 'utf8');
   }
 
   async saveArtifact(input: {
@@ -91,7 +89,7 @@ export class ArtifactStore {
     const filePath = path.join(artifactDir, filename);
     const body = contentAsString(input.content);
 
-    await writeFile(filePath, body, "utf8");
+    await writeFile(filePath, body, 'utf8');
 
     const artifact: AgentArtifact = {
       id: artifactId,
@@ -104,7 +102,7 @@ export class ArtifactStore {
       summary: input.summary,
       metadata: input.metadata,
       actionId: input.actionId,
-      contentPreview: sanitizeArtifactPreview(body)
+      contentPreview: sanitizeArtifactPreview(body),
     };
 
     const index = await this.loadIndex(input.projectId);

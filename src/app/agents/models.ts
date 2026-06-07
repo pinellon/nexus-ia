@@ -1,53 +1,53 @@
-export type AgentRiskLevel = "low" | "medium" | "high";
+export type AgentRiskLevel = 'low' | 'medium' | 'high';
 export type AgentRunStatus =
-  | "started"
-  | "planning"
-  | "running"
-  | "needs_approval"
-  | "completed"
-  | "failed"
-  | "cancelled"
-  | "interrupted";
+  | 'started'
+  | 'planning'
+  | 'running'
+  | 'needs_approval'
+  | 'completed'
+  | 'failed'
+  | 'cancelled'
+  | 'interrupted';
 
 export type AgentEventType =
-  | "started"
-  | "planning"
-  | "running"
-  | "reading_project"
-  | "tool_call"
-  | "tool_result"
-  | "artifact_created"
-  | "patch_created"
-  | "file_created"
-  | "preview_ready"
-  | "needs_approval"
-  | "completed"
-  | "failed"
-  | "cancelled"
-  | "interrupted";
+  | 'started'
+  | 'planning'
+  | 'running'
+  | 'reading_project'
+  | 'tool_call'
+  | 'tool_result'
+  | 'artifact_created'
+  | 'patch_created'
+  | 'file_created'
+  | 'preview_ready'
+  | 'needs_approval'
+  | 'completed'
+  | 'failed'
+  | 'cancelled'
+  | 'interrupted';
 
 export type AgentArtifactType =
-  | "plan"
-  | "diff"
-  | "patch"
-  | "terminal_output"
-  | "test_result"
-  | "file_summary"
-  | "security_report"
-  | "docs_update";
+  | 'plan'
+  | 'diff'
+  | 'patch'
+  | 'terminal_output'
+  | 'test_result'
+  | 'file_summary'
+  | 'security_report'
+  | 'docs_update';
 
 export type ToolName =
-  | "read_project_tree"
-  | "read_file"
-  | "search_files"
-  | "propose_patch"
-  | "run_terminal_command"
-  | "git_status"
-  | "git_diff"
-  | "run_tests"
-  | "run_build"
-  | "generate_readme"
-  | "analyze_error";
+  | 'read_project_tree'
+  | 'read_file'
+  | 'search_files'
+  | 'propose_patch'
+  | 'run_terminal_command'
+  | 'git_status'
+  | 'git_diff'
+  | 'run_tests'
+  | 'run_build'
+  | 'generate_readme'
+  | 'analyze_error';
 
 export interface AgentDefinition {
   id: string;
@@ -64,7 +64,7 @@ export interface ToolCall {
   input: Record<string, unknown>;
   startedAt: string;
   completedAt?: string;
-  status: "started" | "completed" | "failed" | "needs_approval";
+  status: 'started' | 'completed' | 'failed' | 'needs_approval';
   summary?: string;
 }
 
@@ -82,8 +82,8 @@ export interface ToolResult {
 export interface AgentStep {
   id: string;
   title: string;
-  kind: "plan" | "tool" | "artifact" | "analysis";
-  status: "pending" | "running" | "completed" | "failed";
+  kind: 'plan' | 'tool' | 'artifact' | 'analysis';
+  status: 'pending' | 'running' | 'completed' | 'failed';
   startedAt: string;
   completedAt?: string;
   detail?: string;
@@ -97,7 +97,7 @@ export interface AgentEvent {
   type: AgentEventType;
   createdAt: string;
   message: string;
-  level: "info" | "warning" | "error";
+  level: 'info' | 'warning' | 'error';
   payload?: Record<string, unknown>;
 }
 
