@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Model checkpoints and generated model artifacts
+*.pt
+*.ckpt
+*.safetensors
+model/
+model_*/
+models/
+releases/*/*.pt
+model_micro/
+
+# Tokenizer files
+data/tokens/
+data/tokens_micro/
+
+data/raw/
+data/clean/
+data/sources/
+data/corpus_manifest.jsonl
+
+
+# Logs
+logs/
+
+# Generated caches and imported scratch data
+cache/
+previews/
+releases/
+infer_output.txt
+.tmp_user_zip_files*/
+_archive/
+
+# SQLite memory DB
+memory/*.db
+
+# Misc
+.DS_Store

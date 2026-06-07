@@ -1,0 +1,92 @@
+[
+  {
+    "id": "site_barbearia",
+    "category": "web",
+    "expected_task_type": "site_html",
+    "prompt": "cria um site bonito pra uma barbearia"
+  },
+  {
+    "id": "site_codigo_puro",
+    "category": "web",
+    "expected_task_type": "site_html",
+    "prompt": "crie um HTML completo para uma pizzaria. responda so o codigo, sem explicar"
+  },
+  {
+    "id": "site_sem_markdown",
+    "category": "web",
+    "expected_task_type": "site_html",
+    "prompt": "gere uma pagina HTML completa para uma academia, sem markdown"
+  },
+  {
+    "id": "flask_clientes",
+    "category": "backend",
+    "expected_task_type": "flask_api",
+    "prompt": "faz uma api flask de cadastro de cliente com nome email telefone"
+  },
+  {
+    "id": "flask_health",
+    "category": "backend",
+    "expected_task_type": "flask_api",
+    "prompt": "responda apenas o codigo de uma API Flask com rota /health"
+  },
+  {
+    "id": "flask_json_error",
+    "category": "backend",
+    "expected_task_type": "flask_api",
+    "prompt": "crie uma api flask que retorne erro json quando faltar campo obrigatorio"
+  },
+  {
+    "id": "react_product_card",
+    "category": "react",
+    "expected_task_type": "react_component",
+    "prompt": "cria um componente react de card de produto com nome preco e botao comprar"
+  },
+  {
+    "id": "react_search_empty",
+    "category": "react",
+    "expected_task_type": "react_component",
+    "prompt": "faz um componente React com busca em lista e estado vazio"
+  },
+  {
+    "id": "electron_secure",
+    "category": "electron",
+    "expected_task_type": "electron_app",
+    "prompt": "faz um app electron simples com janela segura"
+  },
+  {
+    "id": "electron_preload",
+    "category": "electron",
+    "expected_task_type": "electron_app",
+    "prompt": "crie exemplo electron com main e preload, contextIsolation true e nodeIntegration false"
+  },
+  {
+    "id": "patch_review",
+    "category": "patch",
+    "expected_task_type": "patch_review",
+    "prompt": "gere um patch revisavel para corrigir uma funcao que divide por zero"
+  },
+  {
+    "id": "bugfix_python",
+    "category": "debug",
+    "expected_task_type": "bugfix",
+    "prompt": "corrige esse codigo aqui: def soma(a,b) return a+b"
+  },
+  {
+    "id": "explain_error",
+    "category": "debug",
+    "expected_task_type": "explain_error",
+    "prompt": "explique em poucas palavras esse erro: ModuleNotFoundError: No module named flask"
+  },
+  {
+    "id": "portuguese_only",
+    "category": "format",
+    "expected_task_type": "project_question",
+    "prompt": "responda em portugues: o que falta para o NexusAI virar assistente de codigo?"
+  },
+  {
+    "id": "ask_missing_info",
+    "category": "format",
+    "expected_task_type": "site_html",
+    "prompt": "crie um site para minha empresa"
+  }
+]

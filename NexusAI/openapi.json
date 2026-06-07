@@ -1,0 +1,378 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "NexusAI Local API",
+    "version": "0.1.0",
+    "description": "Local NexusAI generation API with raw and controlled generation modes."
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "Check local API and selected model config",
+        "responses": {
+          "200": {
+            "description": "Health response"
+          }
+        }
+      }
+    },
+    "/generate": {
+      "post": {
+        "summary": "Raw model generation",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Generated response"
+          },
+          "400": {
+            "description": "Invalid request"
+          }
+        }
+      }
+    },
+    "/generate-controlled": {
+      "post": {
+        "summary": "Controlled generation with task routing, validation, retry, and failure capture",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ControlledGenerateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Controlled generation result"
+          },
+          "400": {
+            "description": "Invalid request"
+          }
+        }
+      }
+    },
+    "/repo/index": {
+      "post": {
+        "summary": "Index a local project and create .nexus project metadata",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RepoProjectRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Project index"
+          },
+          "400": {
+            "description": "Invalid request"
+          }
+        }
+      }
+    },
+    "/repo/context": {
+      "post": {
+        "summary": "Select relevant files for a repo task",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RepoContextRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Selected project context"
+          },
+          "400": {
+            "description": "Invalid request"
+          }
+        }
+      }
+    },
+    "/repo/task": {
+      "post": {
+        "summary": "Run a controlled repo task as patch review",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RepoTaskRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Repo task result"
+          },
+          "400": {
+            "description": "Invalid request"
+          }
+        }
+      }
+    },
+    "/repo/test": {
+      "post": {
+        "summary": "Run stack-aware project validation commands",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RepoProjectRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Test results"
+          },
+          "400": {
+            "description": "Invalid request"
+          }
+        }
+      }
+    },
+    "/repo/apply": {
+      "post": {
+        "summary": "Apply approved file changes with backup, diff, rollback history, and dependency guard",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RepoApplyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Patch application record"
+          },
+          "400": {
+            "description": "Invalid request or blocked patch"
+          },
+          "403": {
+            "description": "Approval required"
+          }
+        }
+      }
+    },
+    "/repo/rollback": {
+      "post": {
+        "summary": "Rollback the last NexusAI patch in a project",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RepoProjectRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Rollback result"
+          },
+          "400": {
+            "description": "Invalid request"
+          }
+        }
+      }
+    },
+    "/openapi.json": {
+      "get": {
+        "summary": "Return this OpenAPI document",
+        "responses": {
+          "200": {
+            "description": "OpenAPI JSON"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "GenerateRequest": {
+        "type": "object",
+        "required": ["prompt"],
+        "additionalProperties": false,
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "minLength": 1
+          },
+          "max_new_tokens": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "repetition_penalty": {
+            "type": "number",
+            "minimum": 0
+          },
+          "few_shot": {
+            "type": "boolean"
+          },
+          "temperature": {
+            "type": "number",
+            "minimum": 0
+          },
+          "top_k": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "use_memory": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ControlledGenerateRequest": {
+        "type": "object",
+        "required": ["prompt"],
+        "additionalProperties": false,
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "minLength": 1
+          },
+          "task_type": {
+            "type": "string",
+            "enum": [
+              "site_html",
+              "flask_api",
+              "react_component",
+              "electron_app",
+              "patch_review",
+              "bugfix",
+              "explain_error",
+              "project_question"
+            ]
+          },
+          "retries": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2
+          },
+          "use_memory": {
+            "type": "boolean"
+          },
+          "save_preview": {
+            "type": "boolean"
+          }
+        }
+      },
+      "RepoProjectRequest": {
+        "type": "object",
+        "required": ["project_dir"],
+        "additionalProperties": false,
+        "properties": {
+          "project_dir": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "RepoContextRequest": {
+        "type": "object",
+        "required": ["project_dir", "prompt"],
+        "additionalProperties": false,
+        "properties": {
+          "project_dir": {
+            "type": "string",
+            "minLength": 1
+          },
+          "prompt": {
+            "type": "string",
+            "minLength": 1
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20
+          }
+        }
+      },
+      "RepoTaskRequest": {
+        "type": "object",
+        "required": ["project_dir", "prompt"],
+        "additionalProperties": false,
+        "properties": {
+          "project_dir": {
+            "type": "string",
+            "minLength": 1
+          },
+          "prompt": {
+            "type": "string",
+            "minLength": 1
+          },
+          "retries": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2
+          },
+          "use_memory": {
+            "type": "boolean"
+          }
+        }
+      },
+      "RepoApplyRequest": {
+        "type": "object",
+        "required": ["project_dir", "approved", "changes"],
+        "additionalProperties": false,
+        "properties": {
+          "project_dir": {
+            "type": "string",
+            "minLength": 1
+          },
+          "approved": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "allow_dependencies": {
+            "type": "boolean"
+          },
+          "changes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["path", "content"],
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "content": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
