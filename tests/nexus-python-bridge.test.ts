@@ -1,4 +1,5 @@
 import { EventEmitter } from "node:events";
+import path from "node:path";
 
 import { describe, expect, it, vi } from "vitest";
 
@@ -68,7 +69,12 @@ describe("nexus-python-bridge", () => {
       options: { maxTaskSeconds: 20, modelTimeoutSeconds: 5, repairTimeoutSeconds: 5 }
     });
 
-    expect(command.args.slice(0, 4)).toEqual(["NexusAI\\repo_mode.py", "task", ".", "add validation for dangerous commands"]);
+    expect(command.args.slice(0, 4)).toEqual([
+      path.join("NexusAI", "repo_mode.py"),
+      "task",
+      ".",
+      "add validation for dangerous commands"
+    ]);
     expect(command.args).toContain("--repair_strategy");
     expect(command.args).not.toContain("--task");
   });
