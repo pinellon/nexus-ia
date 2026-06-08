@@ -1,0 +1,22 @@
+[
+  {"id": "coder_001", "task": "Index the repository and summarize Python files.", "mode": "index"},
+  {"id": "coder_002", "task": "Plan a small validation change for dangerous commands.", "mode": "plan"},
+  {"id": "coder_003", "task": "Suggest tests for a Python validator change.", "mode": "suggest_tests"},
+  {"id": "coder_004", "task": "Review a safe patch that edits README.md.", "mode": "review_patch_safe"},
+  {"id": "coder_005", "task": "Review a dangerous patch that edits .env.", "mode": "review_patch_dangerous"},
+  {"id": "coder_006", "task": "Select context for a Flask route validation task.", "mode": "context_python"},
+  {"id": "coder_007", "task": "Select context for a TypeScript provider endpoint task.", "mode": "context_typescript"},
+  {"id": "coder_008", "task": "Generate a coder report for project test strategy.", "mode": "coder_task"},
+  {"id": "coder_009", "task": "Plan documentation updates for release notes.", "mode": "plan"},
+  {"id": "coder_010", "task": "Suggest tests for a package.json script change.", "mode": "suggest_tests"},
+  {"id": "coder_011", "task": "Review a patch that adds a new dependency.", "mode": "review_patch_safe"},
+  {"id": "coder_012", "task": "Detect sensitive credential paths in a proposed patch.", "mode": "review_patch_dangerous"},
+  {"id": "coder_013", "task": "Index config files without reading binary artifacts.", "mode": "index"},
+  {"id": "coder_014", "task": "Select context for JSON validation work.", "mode": "context_python"},
+  {"id": "coder_015", "task": "Plan a small bug fix with no auto apply.", "mode": "plan"},
+  {"id": "coder_016", "task": "Suggest tests for TypeScript and Python bridge code.", "mode": "suggest_tests"},
+  {"id": "coder_017", "task": "Review patch size and scope for a multi-file change.", "mode": "review_patch_safe"},
+  {"id": "coder_018", "task": "Generate report for safe coder-agent orchestration.", "mode": "coder_task"},
+  {"id": "coder_019", "task": "Confirm no internet or external API is needed.", "mode": "plan"},
+  {"id": "coder_020", "task": "Confirm no real files are modified by coder tools.", "mode": "coder_task"}
+]
