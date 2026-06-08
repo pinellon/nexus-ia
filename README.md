@@ -1,169 +1,133 @@
-# root-3b3d8007
+# Nexus AI v0.1
 
-## Objetivo
-Criar componente
+Nexus AI v0.1 is a controlled local assistant for development workflows. It is not yet an autonomous coding model.
 
-Contexto atual da IDE:
-Arquivo ativo: nenhum
-Arquivo modificado: nao
-Arquivos abertos: nenhum
-Selecao atual: nenhuma
+The v0.1 release is positioned as a beta/local tool: it reads project context, routes tasks, proposes reviewable changes, validates output, records safety metrics, and uses deterministic repair/fallback paths when the model output is not reliable enough.
 
-Conteudo atual do arquivo ativo:
+## What Works
 
+- Local Node/web server and static IDE shell.
+- Human-approved action and patch flow.
+- Project scanning, file reads/writes, command allowlist, and patch review payloads.
+- Provider routing for local and cloud AI providers.
+- Structured provider health at `/api/providers/health`.
+- Python controlled generation layer with validators, repair, fallback, replay metadata, and smoke reports.
+- Safety checks for dangerous commands, workspace boundaries, stale writes, and fetch restrictions.
 
+## What This Is Not Yet
 
-Arvore resumida do projeto:
-- .github
-  - .github/workflows
-    - .github/workflows/ci.yml
-- .gitignore
-- .tmp-tests
-  - .tmp-tests/action-data
-    - .tmp-tests/action-data/pending-actions.json
-  - .tmp-tests/action-project
-    - .tmp-tests/action-project/src
-      - .tmp-tests/action-project/src/file.ts
-  - .tmp-tests/patch-payload-project
-    - .tmp-tests/patch-payload-project/src
-  - .tmp-tests/patches-flow-data
-    - .tmp-tests/patches-flow-data/pending-actions.json
-  - .tmp-tests/patches-flow-project
-    - .tmp-tests/patches-flow-project/src
-  - .tmp-tests/project-file-store
-    - .tmp-tests/project-file-store/docs
-- docs
-  - docs/agent-test.md
-- electron
-  - electron/main.ts
-  - electron/preload.ts
-- package-lock.json
-- package.json
-- public
-  - public/ai-panel.js
-  - public/app.js
-  - public/devmind.js
-  - public/editor.js
-  - public/explorer.js
-  - public/index.html
-  - public/layout.js
-  - public/patch-review.js
-  - public/site-builder-draft.html
-  - public/styles.css
-  - public/terminal.js
-- README.md
-- scripts
-  - scripts/desktop-build.mjs
-  - scripts/desktop-dev.mjs
-- src
-  - src/action-executor.ts
-  - src/action-planner.ts
-  - src/action-types.ts
-  - src/agents
-    - src/agents/antygravit-agent.ts
-    - src/agents/blackbox-agent.ts
-    - src/agents/claude-agent.ts
-    - src/agents/codex-agent.ts
-    - src/agents/index.ts
-    - src/agents/local-mock-agent.ts
-    - src/agents/shared.ts
-    - src/agents/types.ts
-  - src/app
-    - src/app/agents
-      - src/app/agents/artifacts.ts
-      - src/app/agents/history.ts
-      - src/app/agents/models.ts
-      - src/app/agents/registry.ts
-      - src/app/agents/runner.ts
-      - src/app/agents/tools.ts
-      - src/app/agents/utils.ts
-    - src/app/ai
-      - src/app/ai/ai-settings.ts
-      - src/app/ai/context-builder.ts
-      - src/app/ai/provider-router.ts
-      - src/app/ai/providers
-        - src/app/ai/providers/anthropic-provider.ts
-        - src/app/ai/providers/gemini-provider.ts
-        - src/app/ai/providers/groq-openrouter-provider.ts
-        - src/app/ai/providers/ollama-provider.ts
-        - src/app/ai/providers/openai-provider.ts
-        - src/app/ai/providers/types.ts
-      - src/app/ai/usage-tracker.ts
-    - src/app/runs
-      - src/app/runs/run-store.ts
-    - src/app/web
-      - src/app/web/server.ts
-      - src/app/web/staged-files.ts
+- It is not an autonomous coding model.
+- The local model is not the primary reliability path.
+- `model_direct_pass_rate` is currently `0.0` in the release smoke reports.
+- `fallback_usage_rate` is currently `1.0`; deterministic fallback is the reason the controlled beta is usable.
+- Desktop packaging is not ready. `desktop:build` is still a placeholder.
+- v0.1 does not start v0.1.1 coder tools, v0.2 UI integration, or new model training.
 
-## Visao rapida
-- Projeto analisado em `C:\nexus ai`
-- Agente: UI Agent
-- Ferramenta de docs do Nexus gerou este rascunho revisavel
+## Install
 
-## Estrutura principal
-- .github/workflows/ci.yml
-- .gitignore
-- .tmp-tests/action-data/pending-actions.json
-- .tmp-tests/action-project/src/file.ts
-- .tmp-tests/patches-flow-data/pending-actions.json
-- docs/agent-test.md
-- electron/main.ts
-- electron/preload.ts
-- package-lock.json
-- package.json
-- public/ai-panel.js
-- public/app.js
-- public/devmind.js
-- public/editor.js
-- public/explorer.js
-- public/index.html
-- public/layout.js
-- public/patch-review.js
-
-## Scripts ou metadados detectados
-```json
-{
-  "name": "nexus-ai-mvp",
-  "version": "0.1.0",
-  "private": true,
-  "type": "module",
-  "scripts": {
-    "dev": "tsx watch src/server.ts",
-    "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "test:smoke": "node -e \"console.log('No smoke tests configured yet.')\"",
-    "ci": "npm run typecheck && npm run build && npm test",
-    "start": "node dist/server.js",
-    "build": "tsc -p tsconfig.json",
-    "desktop:dev": "node scripts/desktop-dev.mjs",
-    "desktop:build": "node scripts/desktop-build.mjs"
-  },
-  "dependencies": {
-    "@anthropic-ai/sdk": "^0.57.0",
-    "cors": "^2.8.5",
-    "express": "^5.1.0",
-    "express-rate-limit": "^8.5.2"
-  },
-  "devDependencies": {
-    "@types/cors": "^2.8.19",
-    "@types/express": "^5.0.3",
-    "@types/node": "^24.10.1",
-    "@types/supertest": "^7.2.0",
-    "supertest": "^7.2.2",
-    "tsx": "^4.20.6",
-    "typescript": "^5.9.3",
-    "vitest": "^4.1.6"
-  }
-}
-
+```powershell
+npm install
+python -m pip install flask requests
 ```
 
-## Como contribuir
-1. Revise o Patch Review antes de aplicar mudancas.
-2. Rode build e testes pelos comandos controlados.
-3. Atualize esta documentacao junto com o comportamento do sistema.
+For local model inference, install the heavier Python dependencies separately from `NexusAI/requirements.txt`. They are not required for the v0.1 controlled unit tests.
 
-## Limites atuais
-- O draft foi gerado por heuristica local.
-- Ajustes de tom e detalhes tecnicos devem ser revisados antes de aplicar.
+## Run Locally
+
+```powershell
+npm run dev
+```
+
+The local web app runs on `http://localhost:4000` by default.
+
+Useful endpoints:
+
+- `GET /api/health`
+- `GET /api/providers/health`
+- `GET /api/ai/status`
+- `POST /api/code-chat`
+
+Provider health response shape:
+
+```json
+{
+  "ok": true,
+  "provider_mode": "real",
+  "model_available": true,
+  "fallback_available": true,
+  "notes": []
+}
+```
+
+`provider_mode` can be `real`, `mock`, `fallback`, or `unavailable`.
+
+## Validation
+
+Required local gates for v0.1:
+
+```powershell
+npm run typecheck
+npm run build
+npm test
+python -m py_compile NexusAI/*.py
+cd NexusAI
+python -m unittest test_controlled_components.py
+cd ..
+```
+
+PowerShell note: if wildcard expansion is not passed to Python, use:
+
+```powershell
+Get-ChildItem NexusAI -Filter *.py | ForEach-Object { python -m py_compile $_.FullName }
+```
+
+Latest confirmed gate results from 2026-06-08:
+
+- `npm run typecheck`: passed
+- `npm run build`: passed
+- `npm test`: passed, 34 tests
+- Frontend build: passed, but the separate `frontend/` folder is out of v0.1 release scope
+- Python controlled unit tests: passed, 9 tests
+- Python compile: passed with the PowerShell-compatible command above
+
+## Smoke Reports
+
+Smoke reports are generated by `NexusAI/real_task_runner.py`.
+
+```powershell
+cd NexusAI
+python real_task_runner.py --with_model --suite smoke_25 --repair_strategy fast --max_suite_seconds 900
+python real_task_runner.py --with_model --suite smoke_50 --repair_strategy fast --max_suite_seconds 900
+cd ..
+```
+
+Latest confirmed smoke reports:
+
+- `smoke_25`: 25 resolved, 0 assisted, 0 failed
+- `smoke_50`: 37 resolved, 13 assisted, 0 failed
+- `route_ok_rate`: 1.0
+- `final_valid_rate`: 1.0
+- Dangerous commands executed without approval: 0
+- Writes outside project: 0
+- Leftover Python processes: 0
+
+## Known Limitations
+
+- `rollback_functioning` is `False` in the official smoke criteria because the current smoke suites did not include a resolved `patch_rollback` task.
+- Rollback itself exists in repo mode and is covered by controlled unit/API tests.
+- The release report treats rollback as partially covered, not as a fully passed smoke gate.
+- Direct model success remains limited.
+- Fallback is the primary reliability path.
+- Desktop packaging is not complete.
+
+## Roadmap
+
+- v0.1.1: coder-tool polish, release automation, clearer provider UX, and rollback smoke coverage.
+- v0.2: stricter supervised multi-file workflows, UI integration, and CI benchmark workflow.
+- Model track: improve direct model generation separately from v0.1 release readiness.
+
+## Release Docs
+
+- `docs/releases/v0.1-release-report.md`
+- `docs/releases/v0.1-checklist.md`
+- `NexusAI/releases/v0.1/README.md`

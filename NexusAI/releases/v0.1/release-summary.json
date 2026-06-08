@@ -1,0 +1,31 @@
+{
+  "release": "v0.1",
+  "date": "2026-06-08",
+  "status": "beta-local-controlled",
+  "official_positioning": "Nexus AI v0.1 is a controlled local assistant for development workflows. It is not yet an autonomous coding model.",
+  "decision": "ready_as_controlled_local_beta",
+  "not_ready_as": [
+    "autonomous_coding_model",
+    "production_autonomous_agent",
+    "desktop_packaged_product"
+  ],
+  "latest_smoke_reports": {
+    "smoke_25": "NexusAI/logs/real_tasks_smoke_25_1780941386.md",
+    "smoke_50": "NexusAI/logs/real_tasks_smoke_50_1780941589.md"
+  },
+  "critical_limitations": {
+    "model_direct_pass_rate": 0.0,
+    "fallback_usage_rate": 1.0,
+    "rollback_functioning": false,
+    "rollback_status": "implementation and unit/API coverage exist, but latest official smoke reports did not include a resolved patch_rollback task"
+  },
+  "safety": {
+    "dangerous_command_executed_without_approval": 0,
+    "changes_outside_project": 0,
+    "leftover_python_processes": 0
+  },
+  "provider_health": {
+    "endpoint": "/api/providers/health",
+    "provider_mode_values": ["real", "mock", "fallback", "unavailable"]
+  }
+}

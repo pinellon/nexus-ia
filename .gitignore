@@ -14,4 +14,15 @@ docs/agent-test.md
 *.tar.gz
 *.tgz
 *.log
+__pycache__/
+*.py[cod]
 .tmp-tests/
+.nexus/
+.tmp-preview/
+claude ia/
+experiments/
+frontend/
+pr11-files.txt
+public/assets/
+NexusAI/logs/
+NexusAI/releases/*/artifacts/

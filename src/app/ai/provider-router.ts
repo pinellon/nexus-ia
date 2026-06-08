@@ -36,6 +36,19 @@ export interface RouteChatResult {
   usage?: unknown;
 }
 
+export type ProviderMode = "real" | "mock" | "fallback" | "unavailable";
+
+export interface ProviderHealth {
+  ok: boolean;
+  provider_mode: ProviderMode;
+  model_available: boolean;
+  fallback_available: boolean;
+  notes: string[];
+  active_provider: string;
+  configured_providers: string[];
+  reachable_local_model: boolean;
+}
+
 // ── Task classification ────────────────────────────────────────────────────
 function classifyTask(goal: string): "simple" | "medium" | "complex" {
   const g = goal.toLowerCase();
@@ -94,6 +107,45 @@ export class AIProviderRouter {
           model: s.providers.ollama.model, base_url: s.providers.ollama.baseUrl }
       },
       usage
+    };
+  }
+
+  async getHealth(): Promise<ProviderHealth> {
+    const status = await this.getStatus();
+    const providers = status.providers;
+    const configuredProviders = Object.entries(providers)
+      .filter(([, provider]) => provider.enabled && provider.configured)
+      .map(([name]) => name);
+    const cloudProviders = configuredProviders.filter((name) => name !== "ollama");
+    const reachableLocalModel = Boolean(providers.ollama.enabled && providers.ollama.reachable);
+    const modelAvailable = cloudProviders.length > 0 || reachableLocalModel;
+    const fallbackAvailable = true;
+    const notes: string[] = [];
+
+    if (cloudProviders.length > 0) {
+      notes.push(`Configured cloud provider(s): ${cloudProviders.join(", ")}.`);
+    }
+    if (reachableLocalModel) {
+      notes.push(`Local Ollama model reachable: ${providers.ollama.model}.`);
+    } else if (providers.ollama.enabled) {
+      notes.push(`Local Ollama model configured but not reachable: ${providers.ollama.model}.`);
+    }
+    if (!modelAvailable && fallbackAvailable) {
+      notes.push("No direct model is available; Nexus will rely on controlled deterministic fallback paths.");
+    }
+    if (status.mode === "manual" && status.provider !== "auto" && !configuredProviders.includes(status.provider)) {
+      notes.push(`Manual provider is selected but unavailable: ${status.provider}.`);
+    }
+
+    return {
+      ok: modelAvailable || fallbackAvailable,
+      provider_mode: modelAvailable ? "real" : fallbackAvailable ? "fallback" : "unavailable",
+      model_available: modelAvailable,
+      fallback_available: fallbackAvailable,
+      notes,
+      active_provider: status.provider,
+      configured_providers: configuredProviders,
+      reachable_local_model: reachableLocalModel
     };
   }
 

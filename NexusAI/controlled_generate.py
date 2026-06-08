@@ -9,7 +9,6 @@ from pathlib import Path
 
 from domain_repair import repair_domain_output
 from failure_store import add_failure
-from infer import run_generation
 from preview_writer import write_html_preview
 from semantic_check import check_semantics
 from task_router import build_controlled_prompt
@@ -27,6 +26,8 @@ class GenerationStepTimeout(TimeoutError):
 
 def _run_generation_worker(kwargs: dict, result_queue) -> None:
     try:
+        from infer import run_generation
+
         result_queue.put({"ok": True, "text": run_generation(**kwargs)})
     except Exception as exc:
         result_queue.put({"ok": False, "error": f"{type(exc).__name__}: {exc}"})
@@ -34,6 +35,8 @@ def _run_generation_worker(kwargs: dict, result_queue) -> None:
 
 def run_generation_with_timeout(*, timeout_seconds: int = 0, stage: str, **kwargs) -> str:
     if timeout_seconds <= 0:
+        from infer import run_generation
+
         return run_generation(**kwargs)
 
     ctx = mp.get_context("spawn")
