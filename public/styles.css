@@ -620,6 +620,90 @@ code, pre { font-family: var(--font-mono); }
   overflow: hidden;
 }
 
+.nexus-bridge {
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--vscode-border-subtle);
+  padding: 8px;
+  display: grid;
+  gap: 7px;
+  max-height: 320px;
+  overflow: auto;
+}
+
+.nexus-bridge-head,
+.nexus-bridge-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.nexus-bridge-head strong {
+  font-size: 12px;
+}
+
+.nexus-bridge-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 6px;
+}
+
+.nexus-bridge label {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.nexus-bridge label span {
+  color: var(--vscode-muted);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.nexus-bridge input,
+.nexus-bridge select,
+.nexus-bridge textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--vscode-border);
+  border-radius: 3px;
+  background: #3c3c3c;
+  color: var(--vscode-text);
+  font-size: 12px;
+  padding: 5px 7px;
+}
+
+.nexus-bridge textarea {
+  resize: vertical;
+  min-height: 58px;
+  max-height: 120px;
+  font-family: var(--font-mono);
+}
+
+.nexus-status-line {
+  min-height: 16px;
+  color: var(--vscode-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  overflow-wrap: anywhere;
+}
+
+.nexus-result {
+  min-height: 60px;
+  max-height: 120px;
+  margin: 0;
+  padding: 7px;
+  overflow: auto;
+  border: 1px solid var(--vscode-border-subtle);
+  border-radius: 3px;
+  background: #151515;
+  color: var(--vscode-soft);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  white-space: pre-wrap;
+}
+
 #devmindChat { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
 
 .ai-panel-collapsed {

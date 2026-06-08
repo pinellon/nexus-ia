@@ -11,6 +11,7 @@ The v0.1 release is positioned as a beta/local tool: it reads project context, r
 - Project scanning, file reads/writes, command allowlist, and patch review payloads.
 - Provider routing for local and cloud AI providers.
 - Structured provider health at `/api/providers/health`.
+- v0.2 supervised TypeScript-to-Python bridge at `/api/nexus/health` and `/api/nexus/run`.
 - Python controlled generation layer with validators, repair, fallback, replay metadata, and smoke reports.
 - Safety checks for dangerous commands, workspace boundaries, stale writes, and fetch restrictions.
 
@@ -21,7 +22,7 @@ The v0.1 release is positioned as a beta/local tool: it reads project context, r
 - `model_direct_pass_rate` is currently `0.0` in the release smoke reports.
 - `fallback_usage_rate` is currently `1.0`; deterministic fallback is the reason the controlled beta is usable.
 - Desktop packaging is not ready. `desktop:build` is still a placeholder.
-- v0.1 does not start v0.1.1 coder tools, v0.2 UI integration, or new model training.
+- v0.2 does not start v0.3 autonomy, auto-apply, tokenizer work, cloud training, or new model training.
 
 ## Install
 
@@ -44,6 +45,8 @@ Useful endpoints:
 
 - `GET /api/health`
 - `GET /api/providers/health`
+- `GET /api/nexus/health`
+- `POST /api/nexus/run`
 - `GET /api/ai/status`
 - `POST /api/code-chat`
 
@@ -60,6 +63,25 @@ Provider health response shape:
 ```
 
 `provider_mode` can be `real`, `mock`, `fallback`, or `unavailable`.
+
+Nexus Python bridge request:
+
+```json
+{
+  "mode": "plan",
+  "task": "review project structure and suggest tests",
+  "suite": "smoke_25",
+  "root": ".",
+  "options": {
+    "maxTaskSeconds": 60,
+    "maxSuiteSeconds": 1200,
+    "modelTimeoutSeconds": 30,
+    "repairTimeoutSeconds": 20
+  }
+}
+```
+
+Supported modes are `task`, `suite`, `index`, `plan`, and `coder-task`. The bridge launches Python with `spawn` and `shell:false`, validates repo boundaries, caps logs, times out child processes, and always returns `auto_applied:false`.
 
 ## Validation
 
@@ -123,11 +145,13 @@ Latest confirmed smoke reports:
 ## Roadmap
 
 - v0.1.1: coder-tool polish, release automation, clearer provider UX, and rollback smoke coverage.
-- v0.2: stricter supervised multi-file workflows, UI integration, and CI benchmark workflow.
+- v0.2: supervised UI TypeScript to Python bridge.
+- v0.3: controlled autonomy, only after v0.1.1 and v0.2 are merged and stable.
 - Model track: improve direct model generation separately from v0.1 release readiness.
 
 ## Release Docs
 
 - `docs/releases/v0.1-release-report.md`
 - `docs/releases/v0.1-checklist.md`
+- `docs/v0.2-ui-python-bridge-plan.md`
 - `NexusAI/releases/v0.1/README.md`

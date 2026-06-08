@@ -1,6 +1,7 @@
 import type { Express, Response } from "express";
 
 import { ContextBuilder, type CodeChatMessage } from "../ai/context-builder.js";
+import { getNexusHealth, runNexusPython } from "../ai/nexus-python-bridge.js";
 import { AIProviderRouter } from "../ai/provider-router.js";
 import { agentRegistry } from "../agents/registry.js";
 import { agentRunner } from "../agents/runner.js";
@@ -173,6 +174,59 @@ export function registerAgentRoutes(app: Express) {
         notes: [error instanceof Error ? error.message : "Failed to load provider health"]
       });
     }
+  });
+
+  app.get("/api/nexus/health", async (_req, res) => {
+    try {
+      const router = new AIProviderRouter();
+      const providerHealth = await router.getHealth();
+      return res.json(await getNexusHealth(providerHealth as unknown as Record<string, unknown>));
+    } catch (error) {
+      return res.status(500).json({
+        ok: false,
+        python_available: false,
+        nexusai_available: false,
+        provider_health: null,
+        supported_modes: ["task", "suite", "index", "plan", "coder-task"],
+        auto_apply_enabled: false,
+        notes: [error instanceof Error ? error.message : "Failed to load Nexus health"]
+      });
+    }
+  });
+
+  app.post("/api/nexus/run", async (req, res) => {
+    if (!req.body || typeof req.body !== "object" || Array.isArray(req.body)) {
+      return res.status(400).json({
+        ok: false,
+        mode: "unknown",
+        status: "error",
+        final_origin: null,
+        provider_mode: "unavailable",
+        task: null,
+        result: null,
+        metrics: {},
+        logs: [],
+        errors: ["body precisa ser um objeto JSON"],
+        duration_ms: 0,
+        auto_applied: false
+      });
+    }
+
+    const router = new AIProviderRouter();
+    const providerHealth = await router.getHealth().catch(() => ({
+      provider_mode: "unavailable"
+    }));
+    const providerMode = (
+      ["real", "mock", "fallback", "unavailable"].includes(String(providerHealth.provider_mode))
+        ? providerHealth.provider_mode
+        : "unavailable"
+    ) as "real" | "mock" | "fallback" | "unavailable";
+    const result = await runNexusPython(req.body as Record<string, unknown>, { providerMode });
+    const statusCode = result.status === "unsupported" ? 400 : result.ok ? 200 : 500;
+    return res.status(statusCode).json({
+      ...result,
+      provider_health: providerHealth
+    });
   });
 
   app.post("/api/code-chat", aiRateLimiter, async (req, res) => {
