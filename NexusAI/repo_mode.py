@@ -6,8 +6,10 @@ import argparse
 import json
 from pathlib import Path
 
+from coder_agent import run_coder_task
 from controlled_generate import controlled_generate
 from context_budget import apply_context_budget, default_budget_for_project
+from planner import create_plan
 from failure_store import add_failure
 from patch_manager import apply_file_changes, rollback_last
 from repo_indexer import build_project_index, read_small_text, resolve_project_dir
@@ -166,7 +168,16 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="NexusAI repo mode.")
     sub = parser.add_subparsers(dest="cmd", required=True)
     index_cmd = sub.add_parser("index")
-    index_cmd.add_argument("project_dir", nargs="?", default=".")
+    index_cmd.add_argument("project_dir", nargs="?", default=None)
+    index_cmd.add_argument("--root", default=None)
+    plan_cmd = sub.add_parser("plan")
+    plan_cmd.add_argument("--task", required=True)
+    plan_cmd.add_argument("--root", default=".")
+    plan_cmd.add_argument("--context_limit", type=int, default=8)
+    coder_cmd = sub.add_parser("coder-task")
+    coder_cmd.add_argument("--task", required=True)
+    coder_cmd.add_argument("--root", default=".")
+    coder_cmd.add_argument("--context_limit", type=int, default=8)
     context_cmd = sub.add_parser("context")
     context_cmd.add_argument("project_dir")
     context_cmd.add_argument("request")
@@ -187,7 +198,11 @@ def main() -> None:
     args = parser.parse_args()
 
     if args.cmd == "index":
-        print(json.dumps(build_project_index(args.project_dir), ensure_ascii=False, indent=2))
+        print(json.dumps(build_project_index(args.root or args.project_dir or "."), ensure_ascii=False, indent=2))
+    elif args.cmd == "plan":
+        print(json.dumps(create_plan(args.root, args.task, context_limit=args.context_limit), ensure_ascii=False, indent=2))
+    elif args.cmd == "coder-task":
+        print(json.dumps(run_coder_task(args.root, args.task, context_limit=args.context_limit), ensure_ascii=False, indent=2))
     elif args.cmd == "context":
         print(json.dumps(build_repo_context(args.project_dir, args.request, max_chars=args.max_chars or None), ensure_ascii=False, indent=2))
     elif args.cmd == "task":

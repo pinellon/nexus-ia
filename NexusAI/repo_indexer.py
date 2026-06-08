@@ -24,8 +24,32 @@ IGNORED_DIRS = {
     "dist",
     "build",
     "coverage",
+    "reports",
+    "logs",
+    "previews",
+    "experiments",
+    "caches",
+    "cache",
+    ".tmp-preview",
+    ".tmp-tests",
     ".next",
     ".vite",
+}
+
+IGNORED_PATH_PREFIXES = {
+    "data/raw",
+    "data/clean",
+    "data/sources",
+    "data/cache",
+    "nexusai/data/raw",
+    "nexusai/data/clean",
+    "nexusai/data/sources",
+    "nexusai/data/cache",
+    "frontend",
+    "claude ia",
+    "workspace",
+    "nexusai/_archive",
+    "nexusai/.tmp_user_zip_files",
 }
 
 IMPORTANT_NAMES = {
@@ -57,6 +81,8 @@ TEXT_EXTENSIONS = {
     ".txt",
     ".yml",
     ".yaml",
+    ".ini",
+    ".cfg",
 }
 
 
@@ -66,6 +92,10 @@ class FileInfo:
     size: int
     ext: str
     important: bool
+    extension: str
+    size_bytes: int
+    probable_type: str
+    summary: str
 
 
 def resolve_project_dir(project_dir: str | Path) -> Path:
@@ -80,7 +110,49 @@ def is_ignored(path: Path, root: Path) -> bool:
         rel_parts = path.relative_to(root).parts
     except ValueError:
         return True
-    return any(part in IGNORED_DIRS for part in rel_parts)
+    rel_posix = path.relative_to(root).as_posix().lower()
+    return any(part in IGNORED_DIRS for part in rel_parts) or any(
+        rel_posix == prefix or rel_posix.startswith(f"{prefix}/") or rel_posix.startswith(prefix)
+        for prefix in IGNORED_PATH_PREFIXES
+    )
+
+
+def looks_binary(path: Path, sample_size: int = 2048) -> bool:
+    try:
+        sample = path.read_bytes()[:sample_size]
+    except OSError:
+        return True
+    return b"\x00" in sample
+
+
+def probable_type(path: Path) -> str:
+    name = path.name.lower()
+    suffix = path.suffix.lower()
+    if suffix == ".py":
+        return "python"
+    if suffix in {".ts", ".tsx"}:
+        return "typescript"
+    if suffix in {".js", ".jsx"}:
+        return "javascript"
+    if suffix == ".json":
+        return "json"
+    if suffix == ".md":
+        return "markdown"
+    if suffix in {".yml", ".yaml", ".toml", ".ini", ".cfg"} or name in IMPORTANT_NAMES:
+        return "config"
+    if suffix in {".html", ".css"}:
+        return "web"
+    return "text"
+
+
+def summarize_file(path: Path) -> str:
+    ptype = probable_type(path)
+    name = path.name
+    if name in IMPORTANT_NAMES:
+        return f"Important {ptype} file `{name}`."
+    if "test" in path.as_posix().lower() or "spec" in path.as_posix().lower():
+        return f"{ptype} test-related file."
+    return f"{ptype} source file."
 
 
 def iter_project_files(root: Path, max_files: int = 1200) -> list[Path]:
@@ -96,6 +168,8 @@ def iter_project_files(root: Path, max_files: int = 1200) -> list[Path]:
             if path.stat().st_size > 400_000:
                 continue
         except OSError:
+            continue
+        if looks_binary(path):
             continue
         files.append(path)
     return files
@@ -234,6 +308,10 @@ def build_project_index(project_dir: str | Path, *, max_files: int = 1200) -> di
                 size=stat.st_size,
                 ext=path.suffix.lower(),
                 important=rel in important,
+                extension=path.suffix.lower(),
+                size_bytes=stat.st_size,
+                probable_type=probable_type(path),
+                summary=summarize_file(path),
             ).__dict__
         )
 
