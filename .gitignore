@@ -26,3 +26,7 @@ pr11-files.txt
 public/assets/
 NexusAI/logs/
 NexusAI/releases/*/artifacts/
+
+# NexusAI memory data (task queue, audit log, plans) – keep docs & .gitkeep
+NexusAI/memory/*.json
+NexusAI/memory/*.jsonl
