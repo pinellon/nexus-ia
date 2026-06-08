@@ -160,6 +160,21 @@ export function registerAgentRoutes(app: Express) {
     }
   });
 
+  app.get("/api/providers/health", async (_req, res) => {
+    try {
+      const router = new AIProviderRouter();
+      return res.json(await router.getHealth());
+    } catch (error) {
+      return res.status(500).json({
+        ok: false,
+        provider_mode: "unavailable",
+        model_available: false,
+        fallback_available: false,
+        notes: [error instanceof Error ? error.message : "Failed to load provider health"]
+      });
+    }
+  });
+
   app.post("/api/code-chat", aiRateLimiter, async (req, res) => {
     const { messages, streaming, allow_premium, force_local, project_context } = req.body as {
       messages?: unknown;

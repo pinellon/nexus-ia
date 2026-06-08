@@ -1,7 +1,6 @@
 from flask import Flask, request, jsonify
 import os
 from pathlib import Path
-import infer
 from controlled_generate import controlled_generate
 from failure_ranking import top_failures
 from nexus_commands import run_internal_command
@@ -179,7 +178,9 @@ def generate_code():
     top_k = int(data.get('top_k', 20))
     use_memory = bool(data.get('use_memory', True))
 
-    # Use helper from infer.py
+    # Keep the heavy model stack out of controlled unit tests until /generate is called.
+    import infer
+
     generated = infer.run_generation(
         prompt=prompt,
         max_new_tokens=max_new_tokens,

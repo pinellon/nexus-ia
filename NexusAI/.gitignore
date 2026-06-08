@@ -29,7 +29,13 @@ logs/
 # Generated caches and imported scratch data
 cache/
 previews/
-releases/
+releases/*
+!releases/v0.1/
+!releases/v0.1/README.md
+!releases/v0.1/release-summary.json
+!releases/v0.1/smoke_25-summary.json
+!releases/v0.1/smoke_50-summary.json
+!releases/v0.1/known-limitations.md
 infer_output.txt
 .tmp_user_zip_files*/
 _archive/
