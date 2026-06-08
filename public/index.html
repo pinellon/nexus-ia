@@ -137,6 +137,38 @@
         <button type="button" class="btn-secondary btn-sm" id="btn-use-selection-context"><i class="codicon codicon-selection"></i> Seleção</button>
       </div>
       <div class="ai-panel-body">
+        <section class="nexus-bridge" id="nexus-bridge">
+          <div class="nexus-bridge-head">
+            <strong>Nexus Python</strong>
+            <span class="badge miss" id="nexus-health-badge">offline</span>
+          </div>
+          <div class="nexus-bridge-grid">
+            <label>
+              <span>Modo</span>
+              <select id="nexus-mode">
+                <option value="plan">plan</option>
+                <option value="coder-task">coder-task</option>
+                <option value="index">index</option>
+                <option value="task">task</option>
+                <option value="suite">suite</option>
+              </select>
+            </label>
+            <label>
+              <span>Suite</span>
+              <input id="nexus-suite" type="text" value="smoke_25" autocomplete="off">
+            </label>
+          </div>
+          <label class="nexus-task-row">
+            <span>Task</span>
+            <textarea id="nexus-task" rows="3" spellcheck="false"></textarea>
+          </label>
+          <div class="nexus-bridge-actions">
+            <button type="button" class="btn-primary btn-sm" id="nexus-run"><i class="codicon codicon-play"></i> Run</button>
+            <button type="button" class="btn-secondary btn-sm" id="nexus-cancel" disabled><i class="codicon codicon-debug-stop"></i> Cancel</button>
+          </div>
+          <div class="nexus-status-line" id="nexus-status-line"></div>
+          <pre class="nexus-result" id="nexus-result"></pre>
+        </section>
         <div id="devmindChat"></div>
       </div>
     </aside>
@@ -219,6 +251,7 @@
   <script src="/terminal.js"></script>
   <script src="/patch-review.js"></script>
   <script src="/agent-progress.js"></script>
+  <script src="/nexus-bridge.js"></script>
   <script src="/ai-panel.js"></script>
   <script src="/search.js"></script>
   <script src="/sidebar-panels.js"></script>

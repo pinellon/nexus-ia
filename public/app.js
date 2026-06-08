@@ -344,6 +344,7 @@ function initApp() {
   initExplorer();
   initTerminal();
   initAiPanel();
+  if (typeof initNexusBridgePanel === "function") initNexusBridgePanel();
   if (typeof initSearch === "function") initSearch();
 
   $("#btn-save-ia")?.addEventListener("click", async () => {
