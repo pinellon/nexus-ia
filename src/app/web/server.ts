@@ -8,6 +8,7 @@ import type { AgentEvent, AgentRunStatus } from "../agents/models.js";
 import { runEventBus } from "../runs/run-event-bus.js";
 import { addStagedFile, applyStagedFile, clearStagedFiles, getStagedFile, listStagedFiles, removeStagedFile } from "./staged-files.js";
 import { aiRateLimiter } from "../../rate-limit.js";
+import { getActiveProject, resolveProjectRootForRequest } from "../../active-project.js";
 
 const contextBuilder = new ContextBuilder();
 const finalEventTypes = new Set(["completed", "failed", "cancelled", "interrupted", "needs_approval"]);
@@ -79,15 +80,30 @@ function wait(ms: number) {
 async function waitForSettledRun(runId: string) {
   const activeStatuses = new Set<AgentRunStatus>(["started", "planning", "running"]);
 
-  for (let attempt = 0; attempt < 24; attempt += 1) {
+  for (let attempt = 0; attempt < 8; attempt += 1) {
     const run = agentRunner.getRun(runId);
     if (!run || !activeStatuses.has(run.status)) {
       return run;
     }
-    await wait(75);
+    await wait(100);
   }
 
   return agentRunner.getRun(runId);
+}
+
+function collectPatchPaths(runId: string) {
+  const paths = new Set<string>();
+  for (const artifact of agentRunner.getArtifacts(runId)) {
+    const path = artifact.metadata?.path;
+    if (typeof path === "string" && path.trim()) {
+      paths.add(path);
+    }
+    if (artifact.title?.includes(" for ")) {
+      const fromTitle = artifact.title.split(" for ").pop()?.trim();
+      if (fromTitle) paths.add(fromTitle);
+    }
+  }
+  return Array.from(paths);
 }
 
 function collectPatchIds(runId: string) {
@@ -111,6 +127,15 @@ function collectPatchIds(runId: string) {
   }
 
   return Array.from(patchIds);
+}
+
+function collectPreviewUrl(runId: string) {
+  for (const event of agentRunner.getEvents(runId).slice().reverse()) {
+    if (event.type === "preview_ready" && typeof event.payload?.url === "string") {
+      return event.payload.url;
+    }
+  }
+  return null;
 }
 
 function buildNextActions(patchIds: string[]) {
@@ -191,9 +216,10 @@ export function registerAgentRoutes(app: Express) {
     }
 
     try {
+      const activeProject = getActiveProject();
       const context = await contextBuilder.buildContext({
         messages: normalizedMessages,
-        projectRoot: "."
+        projectRoot: activeProject.root
       });
       const uiContext = typeof project_context === "string" ? project_context.slice(0, 10_000) : "";
       const routedContext = uiContext
@@ -241,10 +267,12 @@ export function registerAgentRoutes(app: Express) {
 
       const agentId = suggestAgentId(goal);
       const agentGoal = uiContext ? `${goal}\n\nContexto atual da IDE:\n${uiContext}` : goal;
-      const run = await agentRunner.run_agent(agentId, agentGoal, ".");
+      const run = await agentRunner.run_agent(agentId, agentGoal, activeProject.root);
       const settledRun = await waitForSettledRun(run.id);
       const artifacts = agentRunner.getArtifacts(run.id);
       const patchIds = collectPatchIds(run.id);
+      const patchPaths = collectPatchPaths(run.id);
+      const previewUrl = collectPreviewUrl(run.id);
       const agentMessage = patchIds.length
         ? "Criei uma execucao de agente e preparei patch para revisao."
         : "Criei uma execucao de agente para analisar o pedido.";
@@ -263,6 +291,8 @@ export function registerAgentRoutes(app: Express) {
         agent_id: agentId,
         status: settledRun?.status ?? run.status,
         patch_ids: patchIds,
+        patch_paths: patchPaths,
+        preview_url: previewUrl,
         artifacts: artifacts.map((artifact) => ({
           id: artifact.id,
           type: artifact.type,
@@ -271,6 +301,7 @@ export function registerAgentRoutes(app: Express) {
           action_id: artifact.actionId ?? null
         })),
         next_actions: buildNextActions(patchIds)
+          .concat(previewUrl ? [{ id: "open_preview", label: "Abrir preview", type: "preview", value: previewUrl }] : [])
           .concat(aiDecision.warning ? [{ id: "open_ai_settings", label: "Configurar IA", type: "view", value: "settings" }] : []),
         ai: {
           mode: aiDecision.mode,
@@ -307,7 +338,7 @@ export function registerAgentRoutes(app: Express) {
 
   app.post("/api/staged-files/:id/apply", async (req, res) => {
     try {
-      const file = await applyStagedFile(".", req.params.id);
+      const file = await applyStagedFile(getActiveProject().root, req.params.id);
       return res.json({ ok: true, data: file });
     } catch (err) {
       return res.status(400).json({ ok: false, error: err instanceof Error ? err.message : String(err) });
@@ -328,6 +359,7 @@ export function registerAgentRoutes(app: Express) {
       if (!version) return res.status(404).json({ ok: false, error: "Version not found" });
       
       const updated = await addStagedFile({
+        projectRoot: file.projectRoot,
         path: file.path,
         language: file.language,
         content: version.content,
@@ -373,7 +405,11 @@ export function registerAgentRoutes(app: Express) {
 
     try {
       const selectedAgentId = agent_id?.trim() || suggestAgentId(goal.trim());
-      const run = await agentRunner.run_agent(selectedAgentId, goal.trim(), project_root?.trim() || ".");
+      const run = await agentRunner.run_agent(
+        selectedAgentId,
+        goal.trim(),
+        resolveProjectRootForRequest(project_root?.trim())
+      );
       return res.status(202).json({
         ok: true,
         run_id: run.id,
