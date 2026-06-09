@@ -48,6 +48,16 @@ describe("nexus autonomy api v0.3.3", () => {
     expect(response.body.auto_applied).toBe(false);
   });
 
+  it("rejects autonomy roots outside the repository", async () => {
+    const response = await request(await app())
+      .post("/api/nexus/autonomy/plan")
+      .send({ task: "outside root should fail", root: ".." })
+      .expect(400);
+
+    expect(response.body.auto_applied).toBe(false);
+    expect(response.body.error).toContain("root precisa ficar dentro");
+  });
+
   it("creates plan and reads status", async () => {
     const plan = await createPlan();
     const response = await request(await app())
@@ -126,6 +136,25 @@ describe("nexus autonomy api v0.3.3", () => {
 
     expect(response.body.auto_applied).toBe(false);
     expect(response.body.error).toContain("approval");
+  });
+
+  it("execute rejects multiple action payloads", async () => {
+    const plan = await createPlan("add payload guard");
+    const step = firstMutableStep(plan, "patch_proposal");
+
+    const response = await request(await app())
+      .post("/api/nexus/autonomy/execute")
+      .send({
+        task_id: plan.task_id,
+        step_id: step.step_id,
+        approved: true,
+        command: "npm test",
+        changes: [{ path: "docs/api-test.md", content: "blocked\n" }]
+      })
+      .expect(400);
+
+    expect(response.body.auto_applied).toBe(false);
+    expect(response.body.error).toContain("choose exactly one");
   });
 
   it("cancel works and audit returns events", async () => {

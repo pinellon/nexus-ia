@@ -14,6 +14,14 @@ docs/agent-test.md
 *.tar.gz
 *.tgz
 *.log
+*.tmp
+*.bak
+coverage/
+reports/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.vitest/
 __pycache__/
 *.py[cod]
 .tmp-tests/
@@ -26,6 +34,8 @@ pr11-files.txt
 public/assets/
 NexusAI/logs/
 NexusAI/releases/*/artifacts/
+NexusAI/.tmp_user_zip_files*/
+NexusAI/reports/
 
 # NexusAI memory data (task queue, audit log, plans) – keep docs & .gitkeep
 NexusAI/memory/*.json
