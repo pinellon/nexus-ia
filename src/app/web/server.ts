@@ -1,6 +1,19 @@
 import type { Express, Response } from "express";
 
 import { ContextBuilder, type CodeChatMessage } from "../ai/context-builder.js";
+import {
+  approveAutonomyStep,
+  cancelAutonomyTask,
+  createAutonomyPlan,
+  executeAutonomyStep,
+  getAutonomyAudit,
+  getAutonomyStatus,
+  listAutonomyTasks,
+  rejectAutonomyStep,
+  requestAutonomyChanges,
+  rollbackAutonomy,
+  type NexusAutonomyResult
+} from "../ai/nexus-autonomy-api.js";
 import { getNexusHealth, runNexusPython } from "../ai/nexus-python-bridge.js";
 import { AIProviderRouter } from "../ai/provider-router.js";
 import { agentRegistry } from "../agents/registry.js";
@@ -145,6 +158,34 @@ function isFinalAgentEvent(event: AgentEvent) {
   return finalEventTypes.has(event.type);
 }
 
+function sendAutonomyResult(res: Response, result: NexusAutonomyResult, fallbackStatus = 500) {
+  if (!result.ok) {
+    return res.status(fallbackStatus).json({
+      ok: false,
+      error: result.error || "Falha na autonomia Nexus",
+      data: result.data ?? null,
+      stdout: result.stdout ?? "",
+      stderr: result.stderr ?? "",
+      auto_applied: false
+    });
+  }
+
+  return res.json({
+    ok: true,
+    data: result.data,
+    auto_applied: false
+  });
+}
+
+function readIds(body: unknown) {
+  const data = body as { task_id?: unknown; step_id?: unknown; reason?: unknown };
+  return {
+    taskId: data?.task_id,
+    stepId: data?.step_id,
+    reason: data?.reason
+  };
+}
+
 export function registerAgentRoutes(app: Express) {
   app.get("/api/ai/status", async (_req, res) => {
     try {
@@ -227,6 +268,96 @@ export function registerAgentRoutes(app: Express) {
       ...result,
       provider_health: providerHealth
     });
+  });
+
+  app.get("/api/nexus/autonomy/tasks", async (req, res) => {
+    try {
+      return sendAutonomyResult(res, await listAutonomyTasks(req.query.status), 400);
+    } catch (error) {
+      return res.status(400).json({ ok: false, error: error instanceof Error ? error.message : "Falha ao listar tasks", auto_applied: false });
+    }
+  });
+
+  app.post("/api/nexus/autonomy/plan", async (req, res) => {
+    try {
+      const body = req.body as { task?: unknown; root?: unknown };
+      return sendAutonomyResult(res, await createAutonomyPlan(body?.task, body?.root), 400);
+    } catch (error) {
+      return res.status(400).json({ ok: false, error: error instanceof Error ? error.message : "Falha ao criar plano", auto_applied: false });
+    }
+  });
+
+  app.get("/api/nexus/autonomy/status/:taskId", async (req, res) => {
+    try {
+      return sendAutonomyResult(res, await getAutonomyStatus(req.params.taskId), 404);
+    } catch (error) {
+      return res.status(400).json({ ok: false, error: error instanceof Error ? error.message : "Falha ao carregar status", auto_applied: false });
+    }
+  });
+
+  app.post("/api/nexus/autonomy/approve", async (req, res) => {
+    try {
+      const { taskId, stepId, reason } = readIds(req.body);
+      return sendAutonomyResult(res, await approveAutonomyStep(taskId, stepId, reason), 400);
+    } catch (error) {
+      return res.status(400).json({ ok: false, error: error instanceof Error ? error.message : "Falha ao aprovar step", auto_applied: false });
+    }
+  });
+
+  app.post("/api/nexus/autonomy/reject", async (req, res) => {
+    try {
+      const { taskId, stepId, reason } = readIds(req.body);
+      return sendAutonomyResult(res, await rejectAutonomyStep(taskId, stepId, reason), 400);
+    } catch (error) {
+      return res.status(400).json({ ok: false, error: error instanceof Error ? error.message : "Falha ao rejeitar step", auto_applied: false });
+    }
+  });
+
+  app.post("/api/nexus/autonomy/request-changes", async (req, res) => {
+    try {
+      const { taskId, stepId, reason } = readIds(req.body);
+      return sendAutonomyResult(res, await requestAutonomyChanges(taskId, stepId, reason), 400);
+    } catch (error) {
+      return res.status(400).json({ ok: false, error: error instanceof Error ? error.message : "Falha ao pedir alteracoes", auto_applied: false });
+    }
+  });
+
+  app.post("/api/nexus/autonomy/execute", async (req, res) => {
+    try {
+      const body = req.body as { approved?: unknown };
+      if (body?.approved !== true) {
+        return res.status(403).json({ ok: false, error: "approved:true is required for explicit execution", auto_applied: false });
+      }
+      return sendAutonomyResult(res, await executeAutonomyStep(req.body), 400);
+    } catch (error) {
+      return res.status(400).json({ ok: false, error: error instanceof Error ? error.message : "Falha ao executar step", auto_applied: false });
+    }
+  });
+
+  app.post("/api/nexus/autonomy/rollback", async (req, res) => {
+    try {
+      const body = req.body as { root?: unknown };
+      return sendAutonomyResult(res, await rollbackAutonomy(body?.root), 400);
+    } catch (error) {
+      return res.status(400).json({ ok: false, error: error instanceof Error ? error.message : "Falha ao executar rollback", auto_applied: false });
+    }
+  });
+
+  app.post("/api/nexus/autonomy/cancel", async (req, res) => {
+    try {
+      const body = req.body as { task_id?: unknown; reason?: unknown };
+      return sendAutonomyResult(res, await cancelAutonomyTask(body?.task_id, body?.reason), 400);
+    } catch (error) {
+      return res.status(400).json({ ok: false, error: error instanceof Error ? error.message : "Falha ao cancelar task", auto_applied: false });
+    }
+  });
+
+  app.get("/api/nexus/autonomy/audit/:taskId", async (req, res) => {
+    try {
+      return sendAutonomyResult(res, await getAutonomyAudit(req.params.taskId), 404);
+    } catch (error) {
+      return res.status(400).json({ ok: false, error: error instanceof Error ? error.message : "Falha ao carregar audit log", auto_applied: false });
+    }
   });
 
   app.post("/api/code-chat", aiRateLimiter, async (req, res) => {
