@@ -17,6 +17,8 @@ from strict_mode import strict_check_text
 from task_metrics import finish_session, log_event, start_session
 from test_runner import run_project_tests
 import autonomy_controller as _ac
+import audit_log as _audit
+import task_queue as _queue
 
 
 TASK_KEYWORDS = {
@@ -203,6 +205,10 @@ def main() -> None:
     as_cmd = sub.add_parser("autonomy-status", help="Get status of a controlled-autonomy task.")
     as_cmd.add_argument("--task-id", required=True, dest="task_id", help="UUID of the task.")
     as_cmd.add_argument("--root", default=".", help="Project root directory.")
+    at_cmd = sub.add_parser("autonomy-tasks", help="List controlled-autonomy tasks.")
+    at_cmd.add_argument("--status", default=None)
+    aau_cmd = sub.add_parser("autonomy-audit", help="List audit events for a controlled-autonomy task.")
+    aau_cmd.add_argument("--task-id", required=True, dest="task_id")
     aa_cmd = sub.add_parser("autonomy-approve", help="Approve a specific step (records decision only, does NOT execute).")
     aa_cmd.add_argument("--task-id", required=True, dest="task_id")
     aa_cmd.add_argument("--step-id", required=True, dest="step_id")
@@ -259,6 +265,10 @@ def main() -> None:
         print(json.dumps(_ac.create_task_and_plan(args.task, args.root), ensure_ascii=False, indent=2))
     elif args.cmd == "autonomy-status":
         print(json.dumps(_ac.get_status(args.task_id), ensure_ascii=False, indent=2))
+    elif args.cmd == "autonomy-tasks":
+        print(json.dumps({"tasks": _queue.list_tasks(args.status), "auto_applied": False}, ensure_ascii=False, indent=2))
+    elif args.cmd == "autonomy-audit":
+        print(json.dumps({"task_id": args.task_id, "events": _audit.list_events(args.task_id), "auto_applied": False}, ensure_ascii=False, indent=2))
     elif args.cmd == "autonomy-approve":
         print(json.dumps(_ac.approve_step(args.task_id, args.step_id, reason=args.reason), ensure_ascii=False, indent=2))
     elif args.cmd == "autonomy-reject":

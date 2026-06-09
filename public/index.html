@@ -6,6 +6,7 @@
   <title>Nexus Codex</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@vscode/codicons@0.0.36/dist/codicon.css">
   <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/autonomy.css">
 </head>
 <body>
   <div class="ide-shell" id="ide-shell">
@@ -169,6 +170,58 @@
           <div class="nexus-status-line" id="nexus-status-line"></div>
           <pre class="nexus-result" id="nexus-result"></pre>
         </section>
+        <section class="autonomy-panel" id="autonomy-panel">
+          <div class="autonomy-head">
+            <strong>Autonomia</strong>
+            <span class="badge miss" id="autonomy-auto-badge">auto_applied:false</span>
+            <button type="button" class="icon-btn" id="autonomy-refresh" title="Atualizar"><i class="codicon codicon-refresh"></i></button>
+          </div>
+          <label class="autonomy-field">
+            <span>Task</span>
+            <textarea id="autonomy-task-input" rows="2" spellcheck="false" placeholder="add validation for dangerous commands"></textarea>
+          </label>
+          <div class="autonomy-actions">
+            <button type="button" class="btn-primary btn-sm" id="autonomy-plan"><i class="codicon codicon-list-tree"></i> Plan</button>
+            <button type="button" class="btn-secondary btn-sm" id="autonomy-cancel-task" disabled><i class="codicon codicon-debug-stop"></i> Cancel</button>
+            <button type="button" class="btn-secondary btn-sm" id="autonomy-rollback"><i class="codicon codicon-discard"></i> Rollback</button>
+          </div>
+          <div class="autonomy-status" id="autonomy-status">ready</div>
+          <div class="autonomy-layout">
+            <div class="autonomy-task-list" id="autonomy-task-list"></div>
+            <div class="autonomy-detail">
+              <div class="autonomy-detail-head" id="autonomy-detail-head">Nenhuma task selecionada</div>
+              <div class="autonomy-step-list" id="autonomy-step-list"></div>
+              <div class="autonomy-execute-box">
+                <label class="autonomy-field">
+                  <span>Patch JSON</span>
+                  <textarea id="autonomy-changes-json" rows="4" spellcheck="false">[
+  {
+    "path": "docs/autonomy-ui-note.md",
+    "content": "# Autonomy UI\n\nApproved step execution note.\n"
+  }
+]</textarea>
+                </label>
+                <label class="autonomy-field">
+                  <span>Command</span>
+                  <select id="autonomy-command-select">
+                    <option value="">Patch JSON</option>
+                    <option value="npm test">npm test</option>
+                    <option value="npm run build">npm run build</option>
+                    <option value="python -m py_compile NexusAI/app.py">python py_compile</option>
+                  </select>
+                </label>
+                <div class="autonomy-actions">
+                  <button type="button" class="btn-primary btn-sm" id="autonomy-approve" disabled><i class="codicon codicon-pass"></i> Approve</button>
+                  <button type="button" class="btn-secondary btn-sm" id="autonomy-reject" disabled><i class="codicon codicon-close"></i> Reject</button>
+                  <button type="button" class="btn-secondary btn-sm" id="autonomy-request-changes" disabled><i class="codicon codicon-comment-discussion"></i> Changes</button>
+                  <button type="button" class="btn-primary btn-sm" id="autonomy-execute" disabled><i class="codicon codicon-play"></i> Execute</button>
+                </div>
+              </div>
+              <div class="autonomy-audit" id="autonomy-audit"></div>
+            </div>
+          </div>
+          <pre class="autonomy-result" id="autonomy-result"></pre>
+        </section>
         <div id="devmindChat"></div>
       </div>
     </aside>
@@ -252,6 +305,7 @@
   <script src="/patch-review.js"></script>
   <script src="/agent-progress.js"></script>
   <script src="/nexus-bridge.js"></script>
+  <script src="/autonomy.js"></script>
   <script src="/ai-panel.js"></script>
   <script src="/search.js"></script>
   <script src="/sidebar-panels.js"></script>

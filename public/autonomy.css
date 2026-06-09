@@ -1,0 +1,184 @@
+.autonomy-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border-top: 1px solid var(--vscode-border-subtle);
+  border-bottom: 1px solid var(--vscode-border-subtle);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.autonomy-head,
+.autonomy-actions,
+.autonomy-detail-head,
+.autonomy-task-row,
+.autonomy-step-row,
+.autonomy-audit-row {
+  display: flex;
+  align-items: center;
+}
+
+.autonomy-head {
+  gap: 8px;
+}
+
+.autonomy-head strong {
+  flex: 1;
+}
+
+.autonomy-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--vscode-muted);
+}
+
+.autonomy-field textarea,
+.autonomy-field select {
+  width: 100%;
+  min-width: 0;
+  padding: 6px;
+  border: 1px solid var(--vscode-border);
+  border-radius: 3px;
+  background: #1f1f1f;
+  color: var(--vscode-text);
+  font: 12px var(--font-mono);
+}
+
+.autonomy-field select {
+  font-family: var(--font-ui);
+}
+
+.autonomy-actions {
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.autonomy-status {
+  padding: 5px 6px;
+  border: 1px solid var(--vscode-border-subtle);
+  border-radius: 3px;
+  color: var(--vscode-soft);
+  font-size: 11px;
+}
+
+.autonomy-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+  gap: 8px;
+  min-height: 220px;
+}
+
+.autonomy-task-list,
+.autonomy-step-list,
+.autonomy-audit {
+  overflow: auto;
+  border: 1px solid var(--vscode-border-subtle);
+  border-radius: 3px;
+  min-height: 72px;
+}
+
+.autonomy-task-row,
+.autonomy-step-row {
+  width: 100%;
+  min-width: 0;
+  gap: 6px;
+  padding: 6px;
+  border-bottom: 1px solid var(--vscode-border-subtle);
+  text-align: left;
+  color: var(--vscode-soft);
+  background: transparent;
+}
+
+.autonomy-task-row:hover,
+.autonomy-step-row:hover,
+.autonomy-task-row.active,
+.autonomy-step-row.active {
+  color: var(--vscode-text);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.autonomy-task-title,
+.autonomy-step-main {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.autonomy-task-title,
+.autonomy-step-main span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.autonomy-step-main small,
+.autonomy-audit-row small {
+  display: block;
+  margin-top: 2px;
+  color: var(--vscode-muted);
+  font-size: 10px;
+}
+
+.autonomy-pill {
+  flex-shrink: 0;
+  padding: 2px 5px;
+  border-radius: 3px;
+  background: rgba(76, 194, 255, 0.13);
+  color: #9cdcfe;
+  font-size: 10px;
+}
+
+.autonomy-detail {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.autonomy-detail-head {
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 24px;
+  font-size: 12px;
+}
+
+.autonomy-execute-box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.autonomy-audit-row {
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 6px;
+  border-bottom: 1px solid var(--vscode-border-subtle);
+  font-size: 11px;
+}
+
+.autonomy-empty {
+  padding: 8px;
+  color: var(--vscode-muted);
+  font-size: 11px;
+}
+
+.autonomy-result {
+  max-height: 180px;
+  min-height: 52px;
+  overflow: auto;
+  padding: 8px;
+  border: 1px solid var(--vscode-border-subtle);
+  border-radius: 3px;
+  background: #111;
+  color: var(--vscode-soft);
+  font-size: 11px;
+}
+
+@media (max-width: 1100px) {
+  .autonomy-layout {
+    grid-template-columns: 1fr;
+  }
+}
