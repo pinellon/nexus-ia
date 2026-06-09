@@ -123,6 +123,23 @@ class ControlledComponentsTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 apply_file_changes(root, [{"path": "requirements.txt", "content": "flask\nrequests\n"}])
 
+    def test_patch_manager_blocks_sensitive_paths_and_rolls_back_created_files(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for rel in (".env", ".git/config", "node_modules/pkg/index.js", "NexusAI/memory/audit_log.jsonl", "../escape.txt"):
+                with self.subTest(rel=rel):
+                    with self.assertRaises(ValueError):
+                        apply_file_changes(root, [{"path": rel, "content": "blocked\n"}])
+
+            patch = apply_file_changes(root, [{"path": "created.txt", "content": "hello\n"}])
+            self.assertTrue((root / "created.txt").is_file())
+            rollback = rollback_last(root)
+            self.assertTrue(rollback["rolled_back"])
+            self.assertFalse((root / "created.txt").exists())
+            second = rollback_last(root)
+            self.assertFalse(second["rolled_back"])
+            self.assertTrue(second.get("already_rolled_back"))
+
     def test_metrics_replay_strict_and_sandbox(self) -> None:
         session_id = start_session("teste real", project_dir=".")
         log_event(session_id, "files_read", {"files": ["app.py"]})

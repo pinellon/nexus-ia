@@ -7,7 +7,9 @@ Supported event types
 ---------------------
 task_created, plan_created, approval_required, approval_granted,
 approval_rejected, changes_requested, task_cancelled, task_completed,
-task_failed
+task_failed, snapshot_created, step_execution_started, patch_applied,
+command_executed, rollback_started, rollback_completed,
+step_execution_failed
 """
 
 from __future__ import annotations
@@ -46,6 +48,13 @@ ALLOWED_EVENT_TYPES: frozenset[str] = frozenset(
         "task_cancelled",
         "task_completed",
         "task_failed",
+        "snapshot_created",
+        "step_execution_started",
+        "patch_applied",
+        "command_executed",
+        "rollback_started",
+        "rollback_completed",
+        "step_execution_failed",
     }
 )
 
