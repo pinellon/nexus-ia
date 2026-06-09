@@ -23,6 +23,7 @@ describe("nexus python bridge api", () => {
       auto_apply_enabled: false
     });
     expect(response.body.provider_health).toBeTruthy();
+    expect(response.body.notes.join("\n")).toContain("auto_applied permanece false");
   });
 
   it("rejects invalid run bodies with the v0.2 contract", async () => {
@@ -57,5 +58,22 @@ describe("nexus python bridge api", () => {
       auto_applied: false
     });
     expect(response.body.errors.join("\n")).toContain("modo Nexus nao suportado");
+  });
+
+  it("rejects root traversal for Nexus run requests", async () => {
+    const { app } = await import("../src/server.js");
+
+    const response = await request(app)
+      .post("/api/nexus/run")
+      .send({ mode: "index", root: ".." })
+      .expect(400);
+
+    expect(response.body).toMatchObject({
+      ok: false,
+      mode: "unknown",
+      status: "unsupported",
+      auto_applied: false
+    });
+    expect(response.body.errors.join("\n")).toContain("root precisa ficar dentro do repositorio");
   });
 });

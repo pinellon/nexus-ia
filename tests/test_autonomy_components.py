@@ -613,6 +613,51 @@ class TestAutonomyController(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 403)
 
+    def test_autonomy_execute_api_requires_exactly_one_action(self):
+        from app import app
+        client = app.test_client()
+        response = client.post(
+            "/repo/autonomy/execute",
+            json={
+                "project_dir": ".",
+                "task_id": "task",
+                "step_id": "step",
+                "approved": True,
+                "command": "python -m py_compile app.py",
+                "changes": [{"path": "app.py", "content": ""}],
+            },
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("choose exactly one", response.get_json()["error"])
+
+    def test_autonomy_execute_api_unapproved_step_keeps_auto_applied_false(self):
+        from app import app
+        import autonomy_controller as ac
+        ctrl = self._fresh_controller()
+        ac._default_controller = ctrl
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "app.py").write_text("def health():\n    return 'ok'\n", encoding="utf-8")
+            plan = ctrl.create_task_and_plan("add validation")
+            step = self._first_mutable_step(plan, "patch_proposal")
+
+            client = app.test_client()
+            response = client.post(
+                "/repo/autonomy/execute",
+                json={
+                    "project_dir": str(root),
+                    "task_id": plan["task_id"],
+                    "step_id": step["step_id"],
+                    "approved": True,
+                    "changes": [{"path": "app.py", "content": "changed\n"}],
+                },
+            )
+
+            self.assertEqual(response.status_code, 403)
+            payload = response.get_json()
+            self.assertFalse(payload["auto_applied"])
+            self.assertIn("approval", payload["error"].lower())
+
 
 # -----------------------------------------------------------------------
 # CLI Tests (subprocess-level)
