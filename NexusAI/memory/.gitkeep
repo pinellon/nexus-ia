@@ -1,0 +1,2 @@
+# This file preserves the NexusAI/memory/ directory in git.
+# All *.json and *.jsonl files in this directory are gitignored (runtime data).

@@ -42,6 +42,8 @@ _archive/
 
 # SQLite memory DB
 memory/*.db
+memory/*.json
+memory/*.jsonl
 
 # Misc
 .DS_Store

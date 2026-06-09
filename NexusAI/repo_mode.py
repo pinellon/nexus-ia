@@ -16,6 +16,7 @@ from repo_indexer import build_project_index, read_small_text, resolve_project_d
 from strict_mode import strict_check_text
 from task_metrics import finish_session, log_event, start_session
 from test_runner import run_project_tests
+import autonomy_controller as _ac
 
 
 TASK_KEYWORDS = {
@@ -195,6 +196,28 @@ def main() -> None:
     test_cmd.add_argument("project_dir", nargs="?", default=".")
     rollback_cmd = sub.add_parser("rollback")
     rollback_cmd.add_argument("project_dir", nargs="?", default=".")
+    # --- v0.3 autonomy commands ---
+    ap_cmd = sub.add_parser("autonomy-plan", help="Create a controlled-autonomy task and plan.")
+    ap_cmd.add_argument("--task", required=True, help="Task description / prompt.")
+    ap_cmd.add_argument("--root", default=".", help="Project root directory.")
+    as_cmd = sub.add_parser("autonomy-status", help="Get status of a controlled-autonomy task.")
+    as_cmd.add_argument("--task-id", required=True, dest="task_id", help="UUID of the task.")
+    as_cmd.add_argument("--root", default=".", help="Project root directory.")
+    aa_cmd = sub.add_parser("autonomy-approve", help="Approve a specific step (records decision only, does NOT execute).")
+    aa_cmd.add_argument("--task-id", required=True, dest="task_id")
+    aa_cmd.add_argument("--step-id", required=True, dest="step_id")
+    aa_cmd.add_argument("--reason", default=None)
+    ar_cmd = sub.add_parser("autonomy-reject", help="Reject a specific step.")
+    ar_cmd.add_argument("--task-id", required=True, dest="task_id")
+    ar_cmd.add_argument("--step-id", required=True, dest="step_id")
+    ar_cmd.add_argument("--reason", default=None)
+    arc_cmd = sub.add_parser("autonomy-request-changes", help="Request changes on a specific step.")
+    arc_cmd.add_argument("--task-id", required=True, dest="task_id")
+    arc_cmd.add_argument("--step-id", required=True, dest="step_id")
+    arc_cmd.add_argument("--reason", default=None)
+    ac_cmd = sub.add_parser("autonomy-cancel", help="Cancel a controlled-autonomy task.")
+    ac_cmd.add_argument("--task-id", required=True, dest="task_id")
+    ac_cmd.add_argument("--reason", default=None)
     args = parser.parse_args()
 
     if args.cmd == "index":
@@ -224,6 +247,18 @@ def main() -> None:
         print(json.dumps(run_project_tests(args.project_dir), ensure_ascii=False, indent=2))
     elif args.cmd == "rollback":
         print(json.dumps(rollback_last(args.project_dir), ensure_ascii=False, indent=2))
+    elif args.cmd == "autonomy-plan":
+        print(json.dumps(_ac.create_task_and_plan(args.task, args.root), ensure_ascii=False, indent=2))
+    elif args.cmd == "autonomy-status":
+        print(json.dumps(_ac.get_status(args.task_id), ensure_ascii=False, indent=2))
+    elif args.cmd == "autonomy-approve":
+        print(json.dumps(_ac.approve_step(args.task_id, args.step_id, reason=args.reason), ensure_ascii=False, indent=2))
+    elif args.cmd == "autonomy-reject":
+        print(json.dumps(_ac.reject_step(args.task_id, args.step_id, reason=args.reason), ensure_ascii=False, indent=2))
+    elif args.cmd == "autonomy-request-changes":
+        print(json.dumps(_ac.request_changes_on_step(args.task_id, args.step_id, reason=args.reason), ensure_ascii=False, indent=2))
+    elif args.cmd == "autonomy-cancel":
+        print(json.dumps(_ac.cancel_task(args.task_id, reason=args.reason), ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":
