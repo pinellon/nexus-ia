@@ -203,6 +203,32 @@
         }
       }
     },
+    "/repo/autonomy/execute": {
+      "post": {
+        "summary": "Execute an explicitly approved autonomy step through sandboxed patch, command, or rollback handling",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AutonomyExecuteRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Approved execution result"
+          },
+          "400": {
+            "description": "Invalid request or failed execution"
+          },
+          "403": {
+            "description": "Explicit approval required"
+          }
+        }
+      }
+    },
     "/openapi.json": {
       "get": {
         "summary": "Return this OpenAPI document",
@@ -370,6 +396,60 @@
                 }
               }
             }
+          }
+        }
+      },
+      "AutonomyExecuteRequest": {
+        "type": "object",
+        "required": ["project_dir", "task_id", "step_id", "approved"],
+        "properties": {
+          "project_dir": {
+            "type": "string",
+            "minLength": 1
+          },
+          "task_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "step_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "approved": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "changes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["path", "content"],
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "content": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "command": {
+            "type": "string"
+          },
+          "rollback": {
+            "type": "boolean"
+          },
+          "allow_dependencies": {
+            "type": "boolean"
+          },
+          "allow_install": {
+            "type": "boolean"
+          },
+          "verify_command": {
+            "type": "string"
           }
         }
       }

@@ -355,6 +355,7 @@ class TestAutonomyController(unittest.TestCase):
     def setUp(self):
         import task_queue as tq
         import audit_log as al
+        import autonomy_controller as ac
         self.tmp = tempfile.mkdtemp()
         # Redirect memory files
         tq._MEMORY_DIR = Path(self.tmp) / "memory"
@@ -362,20 +363,33 @@ class TestAutonomyController(unittest.TestCase):
         tq._default_queue = None
         al._MEMORY_DIR = Path(self.tmp) / "memory"
         al._LOG_FILE = al._MEMORY_DIR / "audit_log.jsonl"
+        ac._MEMORY_DIR = Path(self.tmp) / "memory"
+        ac._PLANS_FILE = ac._MEMORY_DIR / "autonomy_plans.json"
+        ac._default_controller = None
 
     def tearDown(self):
         import task_queue as tq
         import audit_log as al
+        import autonomy_controller as ac
         from pathlib import Path
         tq._MEMORY_DIR = Path(_NEXUS_DIR) / "memory"
         tq._QUEUE_FILE = tq._MEMORY_DIR / "task_queue.json"
         tq._default_queue = None
         al._MEMORY_DIR = Path(_NEXUS_DIR) / "memory"
         al._LOG_FILE = al._MEMORY_DIR / "audit_log.jsonl"
+        ac._MEMORY_DIR = Path(_NEXUS_DIR) / "memory"
+        ac._PLANS_FILE = ac._MEMORY_DIR / "autonomy_plans.json"
+        ac._default_controller = None
 
     def _fresh_controller(self):
         from autonomy_controller import AutonomyController
         return AutonomyController()
+
+    def _first_mutable_step(self, result, action_type=None):
+        for step in result["steps"]:
+            if step.get("mutable") and (action_type is None or step.get("action_type") == action_type):
+                return step
+        self.fail(f"No mutable step found for action_type={action_type!r}")
 
     def test_create_task_and_plan_returns_uuid_task_id(self):
         ctrl = self._fresh_controller()
@@ -483,6 +497,122 @@ class TestAutonomyController(unittest.TestCase):
             event_types = [e["event_type"] for e in events]
             self.assertIn("approval_granted", event_types)
 
+    def test_execute_approved_patch_creates_snapshot_and_audit_log(self):
+        import audit_log as al
+        ctrl = self._fresh_controller()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            app_file = root / "app.py"
+            app_file.write_text("def health():\n    return 'ok'\n", encoding="utf-8")
+            plan = ctrl.create_task_and_plan("add validation")
+            step = self._first_mutable_step(plan, "patch_proposal")
+            ctrl.approve_step(plan["task_id"], step["step_id"], reason="approved for test")
+
+            result = ctrl.execute_approved_step(
+                plan["task_id"],
+                step["step_id"],
+                root=str(root),
+                payload={"changes": [{"path": "app.py", "content": "def health():\n    return 'changed'\n"}]},
+                reason="unit test patch",
+            )
+
+            self.assertTrue(result["ok"])
+            self.assertFalse(result["auto_applied"])
+            self.assertIn("changed", app_file.read_text(encoding="utf-8"))
+            self.assertTrue((root / ".nexus" / "patch_history.json").is_file())
+            events = al.list_events(task_id=plan["task_id"])
+            event_types = [event["event_type"] for event in events]
+            self.assertIn("snapshot_created", event_types)
+            self.assertIn("patch_applied", event_types)
+
+    def test_execute_unapproved_step_is_blocked(self):
+        ctrl = self._fresh_controller()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "app.py").write_text("def health():\n    return 'ok'\n", encoding="utf-8")
+            plan = ctrl.create_task_and_plan("add validation")
+            step = self._first_mutable_step(plan, "patch_proposal")
+
+            result = ctrl.execute_approved_step(
+                plan["task_id"],
+                step["step_id"],
+                root=str(root),
+                payload={"changes": [{"path": "app.py", "content": "changed\n"}]},
+            )
+
+            self.assertFalse(result["ok"])
+            self.assertTrue(result["blocked"])
+            self.assertIn("approval", result["error"].lower())
+
+    def test_execute_patch_rolls_back_when_verification_fails(self):
+        ctrl = self._fresh_controller()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            app_file = root / "app.py"
+            app_file.write_text("def health():\n    return 'ok'\n", encoding="utf-8")
+            plan = ctrl.create_task_and_plan("add validation")
+            step = self._first_mutable_step(plan, "patch_proposal")
+            ctrl.approve_step(plan["task_id"], step["step_id"], reason="approved for rollback test")
+
+            result = ctrl.execute_approved_step(
+                plan["task_id"],
+                step["step_id"],
+                root=str(root),
+                payload={
+                    "changes": [{"path": "app.py", "content": "def broken(:\n"}],
+                    "verify_command": "python -m py_compile app.py",
+                },
+            )
+
+            self.assertFalse(result["ok"])
+            self.assertIsNotNone(result["rollback"])
+            self.assertTrue(result["rollback"]["rolled_back"])
+            self.assertIn("return 'ok'", app_file.read_text(encoding="utf-8"))
+
+    def test_execute_sandboxed_command_allowed_and_dangerous_blocked(self):
+        ctrl = self._fresh_controller()
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "app.py").write_text("def health():\n    return 'ok'\n", encoding="utf-8")
+            plan = ctrl.create_task_and_plan("run command")
+            step = self._first_mutable_step(plan, "command_request")
+            ctrl.approve_step(plan["task_id"], step["step_id"], reason="approved command")
+
+            allowed = ctrl.execute_approved_step(
+                plan["task_id"],
+                step["step_id"],
+                root=str(root),
+                payload={"command": "python -m py_compile app.py"},
+            )
+            self.assertTrue(allowed["ok"])
+
+            plan2 = ctrl.create_task_and_plan("run command")
+            step2 = self._first_mutable_step(plan2, "command_request")
+            ctrl.approve_step(plan2["task_id"], step2["step_id"], reason="approved command")
+            blocked = ctrl.execute_approved_step(
+                plan2["task_id"],
+                step2["step_id"],
+                root=str(root),
+                payload={"command": "rm -rf ."},
+            )
+            self.assertFalse(blocked["ok"])
+            self.assertIn("blocked", blocked["error"])
+
+    def test_autonomy_execute_api_requires_approved_true(self):
+        from app import app
+        client = app.test_client()
+        response = client.post(
+            "/repo/autonomy/execute",
+            json={
+                "project_dir": ".",
+                "task_id": "task",
+                "step_id": "step",
+                "approved": False,
+                "changes": [{"path": "app.py", "content": ""}],
+            },
+        )
+        self.assertEqual(response.status_code, 403)
+
 
 # -----------------------------------------------------------------------
 # CLI Tests (subprocess-level)
@@ -546,6 +676,40 @@ class TestCLI(unittest.TestCase):
         result = self._run(["autonomy-cancel", "--task-id", task_id, "--reason", "manual cancellation test"])
         self.assertEqual(result["action"], "cancelled")
         self.assertFalse(result["auto_applied"])
+
+    def test_autonomy_execute_cli_applies_approved_patch(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            target = root / "app.py"
+            target.write_text("def health():\n    return 'ok'\n", encoding="utf-8")
+            changes_file = root / "changes.json"
+            changes_file.write_text(
+                json.dumps([{"path": "app.py", "content": "def health():\n    return 'cli'\n"}]),
+                encoding="utf-8",
+            )
+
+            plan = self._run(["autonomy-plan", "--task", "add validation", "--root", str(root)])
+            mutable = [s for s in plan["steps"] if s.get("action_type") == "patch_proposal"]
+            self.assertTrue(mutable)
+            approve = self._run([
+                "autonomy-approve",
+                "--task-id", plan["task_id"],
+                "--step-id", mutable[0]["step_id"],
+                "--reason", "cli approval",
+            ])
+            self.assertEqual(approve["action"], "approved")
+
+            result = self._run([
+                "autonomy-execute",
+                "--task-id", plan["task_id"],
+                "--step-id", mutable[0]["step_id"],
+                "--root", str(root),
+                "--changes-json", str(changes_file),
+                "--reason", "cli execute",
+            ])
+            self.assertTrue(result["ok"])
+            self.assertFalse(result["auto_applied"])
+            self.assertIn("return 'cli'", target.read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

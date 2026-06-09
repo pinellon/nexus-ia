@@ -218,6 +218,14 @@ def main() -> None:
     ac_cmd = sub.add_parser("autonomy-cancel", help="Cancel a controlled-autonomy task.")
     ac_cmd.add_argument("--task-id", required=True, dest="task_id")
     ac_cmd.add_argument("--reason", default=None)
+    ae_cmd = sub.add_parser("autonomy-execute", help="Execute an explicitly approved autonomy step.")
+    ae_cmd.add_argument("--task-id", required=True, dest="task_id")
+    ae_cmd.add_argument("--step-id", required=True, dest="step_id")
+    ae_cmd.add_argument("--root", default=".")
+    ae_cmd.add_argument("--changes-json", default=None, dest="changes_json")
+    ae_cmd.add_argument("--command", default=None)
+    ae_cmd.add_argument("--rollback", action="store_true")
+    ae_cmd.add_argument("--reason", default=None)
     args = parser.parse_args()
 
     if args.cmd == "index":
@@ -259,6 +267,29 @@ def main() -> None:
         print(json.dumps(_ac.request_changes_on_step(args.task_id, args.step_id, reason=args.reason), ensure_ascii=False, indent=2))
     elif args.cmd == "autonomy-cancel":
         print(json.dumps(_ac.cancel_task(args.task_id, reason=args.reason), ensure_ascii=False, indent=2))
+    elif args.cmd == "autonomy-execute":
+        selected = sum(bool(item) for item in (args.changes_json, args.command, args.rollback))
+        if selected != 1:
+            print(json.dumps({"ok": False, "error": "choose exactly one of --changes-json, --command or --rollback", "auto_applied": False}, ensure_ascii=False, indent=2))
+            return
+        payload: dict = {}
+        if args.changes_json:
+            payload["changes"] = json.loads(Path(args.changes_json).read_text(encoding="utf-8"))
+        if args.command:
+            payload["command"] = args.command
+        if args.rollback:
+            payload["rollback"] = True
+        print(json.dumps(
+            _ac.execute_approved_step(
+                args.task_id,
+                args.step_id,
+                root=args.root,
+                payload=payload,
+                reason=args.reason,
+            ),
+            ensure_ascii=False,
+            indent=2,
+        ))
 
 
 if __name__ == "__main__":

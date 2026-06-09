@@ -9,6 +9,7 @@ from repo_indexer import build_project_index
 from repo_mode import build_repo_context, run_repo_task
 from task_metrics import replay_session, task_success_summary
 from test_runner import run_project_tests
+import autonomy_controller as _ac
 import json
 
 app = Flask(__name__)
@@ -306,6 +307,56 @@ def repo_rollback():
         return jsonify(rollback_last(data['project_dir']))
     except Exception as exc:
         return jsonify({'error': str(exc)}), 400
+
+@app.route('/repo/autonomy/execute', methods=['POST'])
+def repo_autonomy_execute():
+    data = request.get_json(force=True)
+    if not isinstance(data, dict):
+        return jsonify({'error': 'Invalid request: body must be a JSON object'}), 400
+    if data.get('approved') is not True:
+        return jsonify({'error': 'Autonomy execution requires approved=true'}), 403
+
+    project_dir = data.get('project_dir')
+    task_id = data.get('task_id')
+    step_id = data.get('step_id')
+    if not isinstance(project_dir, str) or not project_dir.strip():
+        return jsonify({'error': 'Invalid request: project_dir is required'}), 400
+    if not isinstance(task_id, str) or not task_id.strip():
+        return jsonify({'error': 'Invalid request: task_id is required'}), 400
+    if not isinstance(step_id, str) or not step_id.strip():
+        return jsonify({'error': 'Invalid request: step_id is required'}), 400
+
+    selected = sum([
+        isinstance(data.get('changes'), list),
+        isinstance(data.get('command'), str),
+        data.get('rollback') is True,
+    ])
+    if selected != 1:
+        return jsonify({'error': 'choose exactly one of changes, command or rollback=true'}), 400
+    if 'changes' in data:
+        changes = data.get('changes')
+        if not isinstance(changes, list) or not changes:
+            return jsonify({'error': 'Invalid request: changes must be a non-empty list'}), 400
+        for item in changes:
+            if not isinstance(item, dict) or not isinstance(item.get('path'), str) or 'content' not in item:
+                return jsonify({'error': 'Invalid request: each change needs path and content'}), 400
+
+    payload = {}
+    for key in ('changes', 'command', 'rollback', 'allow_dependencies', 'allow_install', 'verify_command'):
+        if key in data:
+            payload[key] = data[key]
+    result = _ac.execute_approved_step(
+        task_id,
+        step_id,
+        root=project_dir,
+        payload=payload,
+        reason=data.get('reason') if isinstance(data.get('reason'), str) else None,
+    )
+    if result.get('blocked') and 'approval' in str(result.get('error', '')).lower():
+        return jsonify(result), 403
+    if not result.get('ok') and result.get('error'):
+        return jsonify(result), 400
+    return jsonify(result)
 
 @app.route('/command', methods=['POST'])
 def internal_command():
